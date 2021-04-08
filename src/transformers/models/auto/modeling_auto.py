@@ -135,6 +135,13 @@ from ..funnel.modeling_funnel import (
 from ..gpt2.modeling_gpt2 import GPT2ForSequenceClassification, GPT2LMHeadModel, GPT2Model
 
 # Add modeling imports here
+from ..ibart.modeling_ibart import (
+    IBartForConditionalGeneration,
+    IBartForCausalLM,
+    IBartForQuestionAnswering,
+    IBartForSequenceClassification,
+    IBartModel,
+)
 from ..gpt_neo.modeling_gpt_neo import GPTNeoForCausalLM, GPTNeoModel
 from ..ibert.modeling_ibert import (
     IBertForMaskedLM,
@@ -269,6 +276,7 @@ from ..xlnet.modeling_xlnet import (
 )
 from .auto_factory import auto_class_factory
 from .configuration_auto import (
+    IBartConfig,
     AlbertConfig,
     BartConfig,
     BertConfig,
@@ -327,6 +335,7 @@ logger = logging.get_logger(__name__)
 MODEL_MAPPING = OrderedDict(
     [
         # Base model mapping
+        (IBartConfig, IBartModel),
         (GPTNeoConfig, GPTNeoModel),
         (BigBirdConfig, BigBirdModel),
         (Speech2TextConfig, Speech2TextModel),
@@ -418,6 +427,8 @@ MODEL_FOR_PRETRAINING_MAPPING = OrderedDict(
 MODEL_WITH_LM_HEAD_MAPPING = OrderedDict(
     [
         # Model with LM heads mapping
+
+        (IBartConfig, IBartForConditionalGeneration),
         (GPTNeoConfig, GPTNeoForCausalLM),
         (BigBirdConfig, BigBirdForMaskedLM),
         (Speech2TextConfig, Speech2TextForConditionalGeneration),
@@ -462,6 +473,7 @@ MODEL_WITH_LM_HEAD_MAPPING = OrderedDict(
 MODEL_FOR_CAUSAL_LM_MAPPING = OrderedDict(
     [
         # Model for Causal LM mapping
+        (IBartConfig, IBartForCausalLM),
         (GPTNeoConfig, GPTNeoForCausalLM),
         (BigBirdConfig, BigBirdForCausalLM),
         (CamembertConfig, CamembertForCausalLM),
@@ -531,6 +543,8 @@ MODEL_FOR_MASKED_LM_MAPPING = OrderedDict(
 MODEL_FOR_SEQ_TO_SEQ_CAUSAL_LM_MAPPING = OrderedDict(
     [
         # Model for Seq2Seq Causal LM mapping
+
+        (IBartConfig, IBartForConditionalGeneration),
         (M2M100Config, M2M100ForConditionalGeneration),
         (LEDConfig, LEDForConditionalGeneration),
         (BlenderbotSmallConfig, BlenderbotSmallForConditionalGeneration),
@@ -551,6 +565,7 @@ MODEL_FOR_SEQ_TO_SEQ_CAUSAL_LM_MAPPING = OrderedDict(
 MODEL_FOR_SEQUENCE_CLASSIFICATION_MAPPING = OrderedDict(
     [
         # Model for Sequence Classification mapping
+        (IBartConfig, IBartForSequenceClassification),
         (BigBirdConfig, BigBirdForSequenceClassification),
         (ConvBertConfig, ConvBertForSequenceClassification),
         (LEDConfig, LEDForSequenceClassification),
@@ -587,6 +602,7 @@ MODEL_FOR_SEQUENCE_CLASSIFICATION_MAPPING = OrderedDict(
 MODEL_FOR_QUESTION_ANSWERING_MAPPING = OrderedDict(
     [
         # Model for Question Answering mapping
+        (IBartConfig, IBartForQuestionAnswering),
         (BigBirdConfig, BigBirdForQuestionAnswering),
         (ConvBertConfig, ConvBertForQuestionAnswering),
         (LEDConfig, LEDForQuestionAnswering),

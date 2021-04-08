@@ -130,6 +130,7 @@ _import_structure = {
         "load_tf2_weights_in_pytorch_model",
     ],
     # Models
+    "models.ibart": ["IBART_PRETRAINED_CONFIG_ARCHIVE_MAP", "IBartConfig", "IBartTokenizer"],
     "models": [],
     "models.albert": ["ALBERT_PRETRAINED_CONFIG_ARCHIVE_MAP", "AlbertConfig"],
     "models.auto": [
@@ -305,6 +306,7 @@ else:
 # tokenizers-backed objects
 if is_tokenizers_available():
     # Fast tokenizers
+    _import_structure["models.ibart"].append("IBartTokenizerFast")
     _import_structure["models.convbert"].append("ConvBertTokenizerFast")
     _import_structure["models.albert"].append("AlbertTokenizerFast")
     _import_structure["models.bart"].append("BartTokenizerFast")
@@ -439,6 +441,17 @@ if is_torch_available():
     _import_structure["generation_utils"] = ["top_k_top_p_filtering"]
     _import_structure["modeling_utils"] = ["Conv1D", "PreTrainedModel", "apply_chunking_to_forward", "prune_layer"]
     # PyTorch models structure
+
+    _import_structure["models.ibart"].extend(
+        [
+            "IBART_PRETRAINED_MODEL_ARCHIVE_LIST",
+            "IBartForCausalLM",
+            "IBartForConditionalGeneration",
+            "IBartForQuestionAnswering",
+            "IBartForSequenceClassification",
+            "IBartModel",
+        ]
+    )
 
     _import_structure["models.albert"].extend(
         [
@@ -1456,6 +1469,7 @@ if TYPE_CHECKING:
         load_tf2_weights_in_pytorch_model,
     )
     from .models.albert import ALBERT_PRETRAINED_CONFIG_ARCHIVE_MAP, AlbertConfig
+    from .models.ibart import IBART_PRETRAINED_CONFIG_ARCHIVE_MAP, IBartConfig, IBartTokenizer
     from .models.auto import (
         ALL_PRETRAINED_CONFIG_ARCHIVE_MAP,
         CONFIG_MAPPING,
@@ -1622,6 +1636,7 @@ if TYPE_CHECKING:
         from .utils.dummy_sentencepiece_objects import *
 
     if is_tokenizers_available():
+        from .models.ibart import IBartTokenizerFast
         from .models.albert import AlbertTokenizerFast
         from .models.bart import BartTokenizerFast
         from .models.barthez import BarthezTokenizerFast
@@ -1680,6 +1695,15 @@ if TYPE_CHECKING:
 
     # Modeling
     if is_torch_available():
+
+        from .models.ibart import (
+            IBART_PRETRAINED_MODEL_ARCHIVE_LIST,
+            IBartForConditionalGeneration,
+            IBartForCausalLM,
+            IBartForQuestionAnswering,
+            IBartForSequenceClassification,
+            IBartModel,
+        )
 
         # Benchmarks
         from .benchmark.benchmark import PyTorchBenchmark
