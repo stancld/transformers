@@ -22,16 +22,13 @@ logger = logging.get_logger(__name__)
 
 IBART_PRETRAINED_CONFIG_ARCHIVE_MAP = {
     "brand-new-bert-base-cased": "https://huggingface.co/brand-new-bert-base-cased/resolve/main/config.json",
-    # See all IBART models at https://huggingface.co/models?filter=ibart
 }
 
 
 class IBartConfig(PretrainedConfig):
     r"""
     This is the configuration class to store the configuration of a :class:`~transformers.IBartModel`.
-    It is used to instantiate an IBART model according to the specified arguments, defining the model
-    architecture. Instantiating a configuration with the defaults will yield a similar configuration to that of
-    the IBART `brand-new-bert-base-cased <https://huggingface.co/brand-new-bert-base-cased>`__ architecture.
+    It is used to instantiate an IBART model according to the specified arguments.
 
     Configuration objects inherit from  :class:`~transformers.PretrainedConfig` and can be used
     to control the model outputs. Read the documentation from  :class:`~transformers.PretrainedConfig`
@@ -81,6 +78,14 @@ class IBartConfig(PretrainedConfig):
             https://arxiv.org/abs/1909.11556>`__ for more details.
         use_cache (:obj:`bool`, `optional`, defaults to :obj:`True`):
             Whether or not the model should return the last key/values attentions (not used by all models).
+        quant_mode (:obj:`bool`, `optional`, defaults to :obj:`False`):
+            Whether to quantize the model or not.
+        force_dequant (:obj:`str`, `optional`, defaults to :obj:`"none"`):
+            Force dequantize specific nonlinear layer. Dequatized layers are then executed with full precision.
+            :obj:`"none"`, :obj:`"gelu"`, :obj:`"softmax"`, :obj:`"layernorm"` and :obj:`"nonlinear"` are supported. As
+            deafult, it is set as :obj:`"none"`, which does not dequantize any layers. Please specify :obj:`"gelu"`,
+            :obj:`"softmax"`, or :obj:`"layernorm"` to dequantize GELU, Softmax, or LayerNorm, respectively.
+            :obj:`"nonlinear"` will dequantize all nonlinear layers, i.e., GELU, Softmax, and LayerNorm.
         Example::
 
         >>> from transformers import IBartModel, IBartConfig
@@ -96,6 +101,7 @@ class IBartConfig(PretrainedConfig):
     """
     model_type = "ibart"
     keys_to_ignore_at_inference = ["past_key_values"]
+
     def __init__(
         self,
         vocab_size=50265,
@@ -123,6 +129,8 @@ class IBartConfig(PretrainedConfig):
         pad_token_id=1,
         bos_token_id=0,
         eos_token_id=2,
+        quant_mode=False,
+        force_dequant="none",
         **kwargs
     ):
         super().__init__(
@@ -155,8 +163,10 @@ class IBartConfig(PretrainedConfig):
         self.num_hidden_layers = encoder_layers
         self.gradient_checkpointing = gradient_checkpointing
         self.scale_embedding = scale_embedding  # scale factor will be sqrt(d_model) if True
+        self.quant_mode = quant_mode
+        self.force_dequant = force_dequant
 
-        
+
     @property
     def num_attention_heads(self) -> int:
         return self.encoder_attention_heads
