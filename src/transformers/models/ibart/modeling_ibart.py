@@ -334,7 +334,10 @@ class IBartEncoderLayer(nn.Module):
     def __init__(self, config: IBartConfig):
         super().__init__()
         self.quant_mode = config.quant_mode
+        self.force_dequant = config.force_dequant
         self.act_bit = 8
+        self.weight_bit = 8
+        self.ln_output_bit = 32
 
         self.embed_dim = config.d_model
         self.self_attn = IBartAttention(
@@ -342,15 +345,44 @@ class IBartEncoderLayer(nn.Module):
             num_heads=config.encoder_attention_heads,
             dropout=config.attention_dropout,
             quant_mode=self.quant_mode,
-            force_dequant=config.force_dequant,
+            force_dequant=self.force_dequant,
         )
-        self.self_attn_layer_norm = nn.LayerNorm(self.embed_dim)
+
+        self.self_attn_layer_norm = IntLayerNorm(
+            self.embed_dim,
+            eps=1e-5,
+            output_bit=self.ln_output_bit,
+            quant_mode=self.quant_mode,
+            force_dequant=self.force_dequant,
+        )
         self.dropout = config.dropout
-        self.activation_fn = ACT2FN[config.activation_function]
+        self.activation_fn = QuantAct(self.act_bit, quant_mode=self.quant_mode)
         self.activation_dropout = config.activation_dropout
-        self.fc1 = nn.Linear(self.embed_dim, config.encoder_ffn_dim)
-        self.fc2 = nn.Linear(config.encoder_ffn_dim, self.embed_dim)
-        self.final_layer_norm = nn.LayerNorm(self.embed_dim)
+        self.fc1 = QuantLinear(
+            self.embed_dim,
+            config.encoder_ffn_dim,
+            bias=True,
+            weight_bit=self.weight_bit,
+            bias_bit=self.bias_bit,
+            quant_mode=self.quant_mode,
+            per_channel=True,
+        )
+        self.fc2 = QuantLinear(
+            config.encoder_ffn_dim,
+            self.embed_dim,
+            bias=True,
+            weight_bit=self.weight_bit,
+            bias_bit=self.bias_bit,
+            quant_mode=self.quant_mode,
+            per_channel=True,
+        )
+        self.final_layer_norm = IntLayerNorm(
+            self.embed_dim,
+            eps=1e-5,
+            output_bit=self.ln_output_bit,
+            quant_mode=self.quant_mode,
+            force_dequant=self.force_dequant,
+        )
 
     def forward(
         self,
@@ -371,7 +403,7 @@ class IBartEncoderLayer(nn.Module):
                 returned tensors for more detail.
         """
         residual = hidden_states
-        hidden_states, attn_weights, _ = self.self_attn(
+        hidden_states, attn_weights, _, hidden_states_scaling_factor = self.self_attn(
             hidden_states=hidden_states,
             attention_mask=attention_mask,
             layer_head_mask=layer_head_mask,
@@ -379,15 +411,20 @@ class IBartEncoderLayer(nn.Module):
         )
         hidden_states = F.dropout(hidden_states, p=self.dropout, training=self.training)
         hidden_states = residual + hidden_states
-        hidden_states = self.self_attn_layer_norm(hidden_states)
+        hidden_states, hidden_states_scaling_factor = self.self_attn_layer_norm(
+            hidden_states, hidden_states_scaling_factor
+        )
 
         residual = hidden_states
-        hidden_states = self.activation_fn(self.fc1(hidden_states))
+        hidden_states, hidden_states_scaling_factor = self.fc1(hidden_states, hidden_states_scaling_factor)
+        hidden_states, hidden_states_scaling_factor = self.activation_fn(hidden_states, hidden_states_scaling_factor)
         hidden_states = F.dropout(hidden_states, p=self.activation_dropout, training=self.training)
-        hidden_states = self.fc2(hidden_states)
+        hidden_states, hidden_states_scaling_factor = self.fc2(hidden_states, hidden_states_scaling_factor)
         hidden_states = F.dropout(hidden_states, p=self.dropout, training=self.training)
         hidden_states = residual + hidden_states
-        hidden_states = self.final_layer_norm(hidden_states)
+        hidden_states, hidden_states_scaling_factor = self.final_layer_norm(
+            hidden_states, hidden_states_scaling_factor
+        )
 
         if hidden_states.dtype == torch.float16 and (torch.isinf(hidden_states).any() or torch.isnan(hidden_states).any()):
             clamp_value = torch.finfo(hidden_states.dtype).max - 1000
@@ -398,7 +435,7 @@ class IBartEncoderLayer(nn.Module):
         if output_attentions:
             outputs += (attn_weights,)
 
-        return outputs
+        return outputs, hidden_states_scaling_factor
 
 
 class IBartDecoderLayer(nn.Module):
