@@ -43,6 +43,7 @@ from transformers import (
     default_data_collator,
     set_seed,
 )
+from transformers.testing_utils import CaptureLogger
 from transformers.trainer_utils import get_last_checkpoint, is_main_process
 from transformers.utils import check_min_version
 
@@ -229,17 +230,19 @@ def main():
     # download the dataset.
     if data_args.dataset_name is not None:
         # Downloading and loading a dataset from the hub.
-        datasets = load_dataset(data_args.dataset_name, data_args.dataset_config_name)
+        datasets = load_dataset(data_args.dataset_name, data_args.dataset_config_name, cache_dir=model_args.cache_dir)
         if "validation" not in datasets.keys():
             datasets["validation"] = load_dataset(
                 data_args.dataset_name,
                 data_args.dataset_config_name,
                 split=f"train[:{data_args.validation_split_percentage}%]",
+                cache_dir=model_args.cache_dir,
             )
             datasets["train"] = load_dataset(
                 data_args.dataset_name,
                 data_args.dataset_config_name,
                 split=f"train[{data_args.validation_split_percentage}%:]",
+                cache_dir=model_args.cache_dir,
             )
     else:
         data_files = {}
@@ -254,7 +257,7 @@ def main():
         )
         if extension == "txt":
             extension = "text"
-        datasets = load_dataset(extension, data_files=data_files)
+        datasets = load_dataset(extension, data_files=data_files, cache_dir=model_args.cache_dir)
     # See more about loading any type of standard or custom dataset (from files, python dict, pandas DataFrame, etc) at
     # https://huggingface.co/docs/datasets/loading_datasets.html.
 
@@ -316,8 +319,18 @@ def main():
         column_names = datasets["validation"].column_names
     text_column_name = "text" if "text" in column_names else column_names[0]
 
+    # since this will be pickled to avoid _LazyModule error in Hasher force logger loading before tokenize_function
+    tok_logger = transformers.utils.logging.get_logger("transformers.tokenization_utils_base")
+
     def tokenize_function(examples):
-        return tokenizer(examples[text_column_name])
+        with CaptureLogger(tok_logger) as cl:
+            output = tokenizer(examples[text_column_name])
+        # clm input could be much much longer than block_size
+        if "Token indices sequence length is longer than the" in cl.out:
+            tok_logger.warning(
+                "^^^^^^^^^^^^^^^^ Please ignore the warning above - this long input will be chunked into smaller bits before being passed to the model."
+            )
+        return output
 
     tokenized_datasets = datasets.map(
         tokenize_function,

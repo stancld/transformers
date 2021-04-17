@@ -1063,6 +1063,37 @@ class DebertaV2PreTrainedModel:
         requires_backends(self, ["torch"])
 
 
+DEIT_PRETRAINED_MODEL_ARCHIVE_LIST = None
+
+
+class DeiTForImageClassification:
+    def __init__(self, *args, **kwargs):
+        requires_backends(self, ["torch"])
+
+
+class DeiTForImageClassificationWithTeacher:
+    def __init__(self, *args, **kwargs):
+        requires_backends(self, ["torch"])
+
+
+class DeiTModel:
+    def __init__(self, *args, **kwargs):
+        requires_backends(self, ["torch"])
+
+    @classmethod
+    def from_pretrained(self, *args, **kwargs):
+        requires_backends(self, ["torch"])
+
+
+class DeiTPreTrainedModel:
+    def __init__(self, *args, **kwargs):
+        requires_backends(self, ["torch"])
+
+    @classmethod
+    def from_pretrained(self, *args, **kwargs):
+        requires_backends(self, ["torch"])
+
+
 DISTILBERT_PRETRAINED_MODEL_ARCHIVE_LIST = None
 
 
@@ -1832,6 +1863,78 @@ class MBartForSequenceClassification:
 
 
 class MBartModel:
+    def __init__(self, *args, **kwargs):
+        requires_backends(self, ["torch"])
+
+    @classmethod
+    def from_pretrained(self, *args, **kwargs):
+        requires_backends(self, ["torch"])
+
+
+MEGATRON_BERT_PRETRAINED_MODEL_ARCHIVE_LIST = None
+
+
+class MegatronBertForCausalLM:
+    def __init__(self, *args, **kwargs):
+        requires_backends(self, ["torch"])
+
+
+class MegatronBertForMaskedLM:
+    def __init__(self, *args, **kwargs):
+        requires_backends(self, ["torch"])
+
+    @classmethod
+    def from_pretrained(self, *args, **kwargs):
+        requires_backends(self, ["torch"])
+
+
+class MegatronBertForMultipleChoice:
+    def __init__(self, *args, **kwargs):
+        requires_backends(self, ["torch"])
+
+    @classmethod
+    def from_pretrained(self, *args, **kwargs):
+        requires_backends(self, ["torch"])
+
+
+class MegatronBertForNextSentencePrediction:
+    def __init__(self, *args, **kwargs):
+        requires_backends(self, ["torch"])
+
+
+class MegatronBertForPreTraining:
+    def __init__(self, *args, **kwargs):
+        requires_backends(self, ["torch"])
+
+
+class MegatronBertForQuestionAnswering:
+    def __init__(self, *args, **kwargs):
+        requires_backends(self, ["torch"])
+
+    @classmethod
+    def from_pretrained(self, *args, **kwargs):
+        requires_backends(self, ["torch"])
+
+
+class MegatronBertForSequenceClassification:
+    def __init__(self, *args, **kwargs):
+        requires_backends(self, ["torch"])
+
+    @classmethod
+    def from_pretrained(self, *args, **kwargs):
+        requires_backends(self, ["torch"])
+
+
+class MegatronBertForTokenClassification:
+    def __init__(self, *args, **kwargs):
+        requires_backends(self, ["torch"])
+
+    @classmethod
+    def from_pretrained(self, *args, **kwargs):
+        requires_backends(self, ["torch"])
+
+
+class MegatronBertModel:
     def __init__(self, *args, **kwargs):
         requires_backends(self, ["torch"])
 
