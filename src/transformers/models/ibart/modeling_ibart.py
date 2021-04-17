@@ -25,7 +25,6 @@ import torch.nn.functional as F
 from torch import nn
 from torch.nn import CrossEntropyLoss
 
-from ...activations import ACT2FN
 from ...file_utils import (
     add_code_sample_docstrings,
     add_end_docstrings,
@@ -52,7 +51,7 @@ logger = logging.get_logger(__name__)
 
 _CHECKPOINT_FOR_DOC = "brand-new-bert-base-cased"
 _CONFIG_FOR_DOC = "IBartConfig"
-_TOKENIZER_FOR_DOC = "IBartTokenizer"
+_TOKENIZER_FOR_DOC = "BartTokenizer"
 
 
 IBART_PRETRAINED_MODEL_ARCHIVE_LIST = [
@@ -119,7 +118,7 @@ class IBartLearnedPositionalEmbedding(nn.Embedding):
         """`input_ids_shape` is expected to be [bsz x seqlen]."""
         bsz, seq_len = input_ids_shape[:2]
         positions = torch.arange(
-            past_key_values_length, past_key_values_length + seq_len, dtype=torch.int8, device=self.weight.device
+            past_key_values_length, past_key_values_length + seq_len, dtype=torch.long, device=self.weight.device
         )
         return super().forward(positions)
 
@@ -151,7 +150,6 @@ class IBartAttention(nn.Module):
         assert (
             self.head_dim * num_heads == self.embed_dim
         ), f"embed_dim must be divisible by num_heads (got `embed_dim`: {self.embed_dim} and `num_heads`: {num_heads})."
-        self.scaling = self.head_dim ** -0.5
         self.unit_scaling = 1.0
 
         self.is_decoder = is_decoder
@@ -159,7 +157,7 @@ class IBartAttention(nn.Module):
         # {Q, K, V, out}_proj Linear layers
         self.k_proj = QuantLinear(
             self.embed_dim,
-            self.num_heads,
+            self.embed_dim,
             bias=True,
             weight_bit=self.weight_bit,
             bias_bit=self.bias_bit,
@@ -168,7 +166,7 @@ class IBartAttention(nn.Module):
         )
         self.v_proj = QuantLinear(
             self.embed_dim,
-            self.num_heads,
+            self.embed_dim,
             bias=True,
             weight_bit=self.weight_bit,
             bias_bit=self.bias_bit,
@@ -177,7 +175,7 @@ class IBartAttention(nn.Module):
         )
         self.q_proj = QuantLinear(
             self.embed_dim,
-            self.num_heads,
+            self.embed_dim,
             bias=True,
             weight_bit=self.weight_bit,
             bias_bit=self.bias_bit,
@@ -186,7 +184,7 @@ class IBartAttention(nn.Module):
         )
         self.out_proj = QuantLinear(
             self.embed_dim,
-            self.num_heads,
+            self.embed_dim,
             bias=True,
             weight_bit=self.weight_bit,
             bias_bit=self.bias_bit,
@@ -208,6 +206,7 @@ class IBartAttention(nn.Module):
     def forward(
         self,
         hidden_states: torch.Tensor,
+        hidden_states_scaling_factor: torch.tensor,
         key_value_states: Optional[torch.Tensor] = None,
         past_key_value: Optional[Tuple[torch.Tensor]] = None,
         attention_mask: Optional[torch.Tensor] = None,
@@ -222,7 +221,7 @@ class IBartAttention(nn.Module):
         bsz, tgt_len, embed_dim = hidden_states.size()
 
         # get query proj
-        mixed_query_states, mixed_query_states_scaling_factor = self.q_proj(hidden_states, self.scaling)
+        mixed_query_states, mixed_query_states_scaling_factor = self.q_proj(hidden_states, hidden_states_scaling_factor)
         # get key, value proj
         if is_cross_attention and past_key_value is not None:
             # reuse k,v, cross_attentions
@@ -230,25 +229,31 @@ class IBartAttention(nn.Module):
             value_states = past_key_value[1]
         elif is_cross_attention:
             # cross_attentions
-            mixed_key_states, mixed_key_states_scaling_factor = self._shape(self.k_proj(key_value_states, self.unit_scaling), -1, bsz)
-            mixed_value_states, mixed_value_states_scaling_factor = self._shape(self.v_proj(key_value_states, self.unit_scaling), -1, bsz)
+            mixed_key_states, mixed_key_states_scaling_factor = self.k_proj(key_value_states, self.unit_scaling)
+            mixed_key_states = self._shape(mixed_key_states, -1, bsz)
+            mixed_value_states, mixed_value_states_scaling_factor = self.v_proj(key_value_states, self.unit_scaling)
+            mixed_value_states = self._shape(mixed_value_states, -1, bsz)
         elif past_key_value is not None:
             # reuse k, v, self_attention
-            mixed_key_states, mixed_key_states_scaling_factor = self._shape(self.k_proj(hidden_states, self.unit_scaling), -1, bsz)
-            mixed_value_states, mixed_value_states_scaling_factor = self._shape(self.v_proj(hidden_states, self.unit_scaling), -1, bsz)
+            mixed_key_states, mixed_key_states_scaling_factor = self.k_proj(hidden_states, self.unit_scaling)
+            mixed_key_states = self._shape(mixed_key_states, -1, bsz)
+            mixed_value_states, mixed_value_states_scaling_factor = self.v_proj(hidden_states, self.unit_scaling)
+            mixed_value_states = self._shape(mixed_value_states, -1, bsz)
             mixed_key_states = torch.cat([past_key_value[0], mixed_key_states], dim=2)
             mixed_value_states = torch.cat([past_key_value[1], mixed_value_states], dim=2)
         else:
             # self_attention
-            mixed_key_states, mixed_key_states_scaling_factor = self._shape(self.k_proj(hidden_states, self.unit_scaling), -1, bsz)
-            mixed_value_states, mixed_value_states_scaling_factor = self._shape(self.v_proj(hidden_states, self.unit_scaling), -1, bsz)
+            mixed_key_states, mixed_key_states_scaling_factor = self.k_proj(hidden_states, self.unit_scaling)
+            mixed_key_states = self._shape(mixed_key_states, -1, bsz)
+            mixed_value_states, mixed_value_states_scaling_factor = self.v_proj(hidden_states, self.unit_scaling)
+            mixed_value_states = self._shape(mixed_value_states, -1, bsz)
 
         # Requantization
         query_states, query_states_scaling_factor = self.q_activation(
             mixed_query_states, mixed_query_states_scaling_factor
         )
         key_states, key_states_scaling_factor = self.k_activation(mixed_key_states, mixed_key_states_scaling_factor)
-        value_state, _ = self.v_activation(mixed_value_states, mixed_value_states_scaling_factor)
+        value_states, _ = self.v_activation(mixed_value_states, mixed_value_states_scaling_factor)
 
         if self.is_decoder:
             # if cross_attention save Tuple(torch.Tensor, torch.Tensor) of all cross attention key/value_states.
@@ -325,7 +330,7 @@ class IBartAttention(nn.Module):
             .reshape(bsz, tgt_len, embed_dim)
         )
 
-        attn_output = self.out_proj(attn_output)
+        attn_output, _ = self.out_proj(attn_output)  # not sure which scaling factor ideally use
 
         return attn_output, attn_weights_reshaped, past_key_value, attn_weights_scaling_factor
 
@@ -442,7 +447,9 @@ class IBartEncoderLayer(nn.Module):
         if output_attentions:
             outputs += (attn_weights,)
 
-        return outputs, hidden_states_scaling_factor
+        outputs += (hidden_states_scaling_factor, )
+
+        return outputs
 
 
 class IBartDecoderLayer(nn.Module):
@@ -521,6 +528,7 @@ class IBartDecoderLayer(nn.Module):
     def forward(
         self,
         hidden_states: torch.Tensor,
+        hidden_states_scaling_factor: torch.Tensor,
         attention_mask: Optional[torch.Tensor] = None,
         encoder_hidden_states: Optional[torch.Tensor] = None,
         encoder_attention_mask: Optional[torch.Tensor] = None,
@@ -533,6 +541,7 @@ class IBartDecoderLayer(nn.Module):
         """
         Args:
             hidden_states (:obj:`torch.FloatTensor`): input to the layer of shape `(seq_len, batch, embed_dim)`
+            hidden_states_scaling_factor (:obj:`torch.FloatTensor`):
             attention_mask (:obj:`torch.FloatTensor`): attention mask of size
                 `(batch, 1, tgt_len, src_len)` where padding elements are indicated by very large negative values.
             encoder_hidden_states (:obj:`torch.FloatTensor`): cross attention input to the layer of shape `(seq_len, batch, embed_dim)`
@@ -555,6 +564,7 @@ class IBartDecoderLayer(nn.Module):
         # add present self-attn cache to positions 1,2 of present_key_value tuple
         hidden_states, self_attn_weights, present_key_value, hidden_states_scaling_factor = self.self_attn(
             hidden_states=hidden_states,
+            hidden_states_scaling_factor=hidden_states_scaling_factor,
             past_key_value=self_attn_past_key_value,
             attention_mask=attention_mask,
             layer_head_mask=layer_head_mask,
@@ -577,6 +587,7 @@ class IBartDecoderLayer(nn.Module):
             hidden_states, cross_attn_weights, cross_attn_present_key_value, hidden_states_scaling_factor = (
                 self.encoder_attn(
                     hidden_states=hidden_states,
+                    hidden_states_scaling_factor=hidden_states_scaling_factor,
                     key_value_states=encoder_hidden_states,
                     attention_mask=encoder_attention_mask,
                     layer_head_mask=encoder_layer_head_mask,
@@ -926,12 +937,15 @@ class IBartEncoder(IBartPreTrainedModel):
             raise ValueError("You have to specify either input_ids or inputs_embeds")
 
         if inputs_embeds is None:
-            inputs_embeds = self.embed_tokens(input_ids) * self.embed_scale
+            inputs_embeds, hidden_states_scaling_factor = self.embed_tokens(input_ids)
+            inputs_embeds *= self.embed_scale
 
         embed_pos = self.embed_positions(input_shape)
 
         hidden_states = inputs_embeds + embed_pos
-        hidden_states, hidden_states_scaling_factor = self.layernorm_embedding(hidden_states)
+        hidden_states, hidden_states_scaling_factor = self.layernorm_embedding(
+            hidden_states, hidden_states_scaling_factor
+        )
         hidden_states = F.dropout(hidden_states, p=self.dropout, training=self.training)
 
         # expand attention_mask
@@ -967,12 +981,14 @@ class IBartEncoder(IBartPreTrainedModel):
                     layer_outputs = torch.utils.checkpoint.checkpoint(
                         create_custom_forward(encoder_layer),
                         hidden_states,
+                        hidden_states_scaling_factor,
                         attention_mask,
                         (head_mask[idx] if head_mask is not None else None),
                     )
                 else:
                     layer_outputs = encoder_layer(
                         hidden_states,
+                        hidden_states_scaling_factor,
                         attention_mask,
                         layer_head_mask=(head_mask[idx] if head_mask is not None else None),
                         output_attentions=output_attentions,
@@ -1164,7 +1180,8 @@ class IBartDecoder(IBartPreTrainedModel):
         past_key_values_length = past_key_values[0][0].shape[2] if past_key_values is not None else 0
 
         if inputs_embeds is None:
-            inputs_embeds = self.embed_tokens(input_ids) * self.embed_scale
+            inputs_embeds, hidden_states_scaling_factor = self.embed_tokens(input_ids)
+            inputs_embeds *= self.embed_scale
 
         attention_mask = self._prepare_decoder_attention_mask(attention_mask, input_shape, inputs_embeds, past_key_values_length)
 
@@ -1177,7 +1194,9 @@ class IBartDecoder(IBartPreTrainedModel):
         positions = self.embed_positions(input_shape, past_key_values_length)
 
         hidden_states = inputs_embeds + positions
-        hidden_states = self.layernorm_embedding(hidden_states)
+        hidden_states, hidden_states_scaling_factor = self.layernorm_embedding(
+            hidden_states, hidden_states_scaling_factor
+        )
 
         hidden_states = F.dropout(hidden_states, p=self.dropout, training=self.training)
 
@@ -1219,6 +1238,7 @@ class IBartDecoder(IBartPreTrainedModel):
                 layer_outputs = torch.utils.checkpoint.checkpoint(
                     create_custom_forward(decoder_layer),
                     hidden_states,
+                    hidden_states_scaling_factor,
                     attention_mask,
                     encoder_hidden_states,
                     encoder_attention_mask,
@@ -1230,6 +1250,7 @@ class IBartDecoder(IBartPreTrainedModel):
 
                 layer_outputs = decoder_layer(
                     hidden_states,
+                    hidden_states_scaling_factor,
                     attention_mask=attention_mask,
                     encoder_hidden_states=encoder_hidden_states,
                     encoder_attention_mask=encoder_attention_mask,
@@ -1279,6 +1300,7 @@ class IBartModel(IBartPreTrainedModel):
         super().__init__(config)
 
         self.quant_mode = config.quant_mode
+        self.embedding_bit = 8
 
         padding_idx, vocab_size = config.pad_token_id, config.vocab_size
         self.shared = QuantEmbedding(
@@ -1332,6 +1354,13 @@ class IBartModel(IBartPreTrainedModel):
         output_hidden_states=None,
         return_dict=None,
     ):
+        # different to other models, Bart automatically creates decoder_input_ids from
+        # input_ids if no decoder_input_ids are provided
+        if decoder_input_ids is None and decoder_inputs_embeds is None:
+            decoder_input_ids = shift_tokens_right(
+                input_ids, self.config.pad_token_id, self.config.decoder_start_token_id
+            )
+
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
         output_hidden_states = (
             output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
