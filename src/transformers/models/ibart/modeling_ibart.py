@@ -45,7 +45,7 @@ from ...modeling_outputs import (
 from ...modeling_utils import PreTrainedModel
 from ...utils import logging
 from .configuration_ibart import IBartConfig
-from .quant_modules import IntGELU, IntLayerNorm, IntSoftmax, QuantAct, QuantEmbedding, QuantLinear
+from ..ibert.quant_modules import IntGELU, IntLayerNorm, IntSoftmax, QuantAct, QuantEmbedding, QuantLinear
 
 
 logger = logging.get_logger(__name__)
@@ -119,7 +119,7 @@ class IBartLearnedPositionalEmbedding(nn.Embedding):
         """`input_ids_shape` is expected to be [bsz x seqlen]."""
         bsz, seq_len = input_ids_shape[:2]
         positions = torch.arange(
-            past_key_values_length, past_key_values_length + seq_len, dtype=torch.long, device=self.weight.device
+            past_key_values_length, past_key_values_length + seq_len, dtype=torch.int8, device=self.weight.device
         )
         return super().forward(positions)
 
@@ -337,6 +337,7 @@ class IBartEncoderLayer(nn.Module):
         self.force_dequant = config.force_dequant
         self.act_bit = 8
         self.weight_bit = 8
+        self.bias_bit = 32
         self.ln_output_bit = 32
 
         self.embed_dim = config.d_model
@@ -356,7 +357,8 @@ class IBartEncoderLayer(nn.Module):
             force_dequant=self.force_dequant,
         )
         self.dropout = config.dropout
-        self.activation_fn = QuantAct(self.act_bit, quant_mode=self.quant_mode)
+        self.activation_fn = IntGELU(quant_mode=self.quant_mode, force_dequant=self.force_dequant)
+        self.quant_activation_fn = QuantAct(self.act_bit, quant_mode=self.quant_mode)
         self.activation_dropout = config.activation_dropout
         self.fc1 = QuantLinear(
             self.embed_dim,
@@ -387,6 +389,7 @@ class IBartEncoderLayer(nn.Module):
     def forward(
         self,
         hidden_states: torch.Tensor,
+        hidden_states_scaling_factor: torch.Tensor,
         attention_mask: torch.Tensor,
         layer_head_mask: torch.Tensor,
         output_attentions: bool = False,
@@ -394,6 +397,7 @@ class IBartEncoderLayer(nn.Module):
         """
         Args:
             hidden_states (:obj:`torch.FloatTensor`): input to the layer of shape `(seq_len, batch, embed_dim)`
+            hidden_states_scaling_factor
             attention_mask (:obj:`torch.FloatTensor`): attention mask of size
                 `(batch, 1, tgt_len, src_len)` where padding elements are indicated by very large negative values.
             layer_head_mask (:obj:`torch.FloatTensor`): mask for attention heads in a given layer of size
@@ -405,6 +409,7 @@ class IBartEncoderLayer(nn.Module):
         residual = hidden_states
         hidden_states, attn_weights, _, hidden_states_scaling_factor = self.self_attn(
             hidden_states=hidden_states,
+            hidden_states_scaling_factor=hidden_states_scaling_factor,
             attention_mask=attention_mask,
             layer_head_mask=layer_head_mask,
             output_attentions=output_attentions,
@@ -418,6 +423,8 @@ class IBartEncoderLayer(nn.Module):
         residual = hidden_states
         hidden_states, hidden_states_scaling_factor = self.fc1(hidden_states, hidden_states_scaling_factor)
         hidden_states, hidden_states_scaling_factor = self.activation_fn(hidden_states, hidden_states_scaling_factor)
+        # Requantization: 32bit -> 8-bit
+        hidden_states, hidden_states_scaling_factor = self.quant_activation_fn(hidden_states, hidden_states_scaling_factor)
         hidden_states = F.dropout(hidden_states, p=self.activation_dropout, training=self.training)
         hidden_states, hidden_states_scaling_factor = self.fc2(hidden_states, hidden_states_scaling_factor)
         hidden_states = F.dropout(hidden_states, p=self.dropout, training=self.training)
@@ -441,29 +448,75 @@ class IBartEncoderLayer(nn.Module):
 class IBartDecoderLayer(nn.Module):
     def __init__(self, config: IBartConfig):
         super().__init__()
+        self.quant_mode = config.quant_mode
+        self.force_dequant = config.force_dequant
+        self.act_bit = 8
+        self.weight_bit = 8
+        self.bias_bit = 32
+        self.ln_output_bit = 32
+
         self.embed_dim = config.d_model
 
         self.self_attn = IBartAttention(
             embed_dim=self.embed_dim,
-            num_heads=config.decoder_attention_heads,
+            num_heads=config.encoder_attention_heads,
             dropout=config.attention_dropout,
             is_decoder=True,
+            quant_mode=self.quant_mode,
+            force_dequant=self.force_dequant,
         )
         self.dropout = config.dropout
-        self.activation_fn = ACT2FN[config.activation_function]
+        self.activation_fn = IntGELU(quant_mode=self.quant_mode, force_dequant=self.force_dequant)
+        self.quant_activation_fn = QuantAct(self.act_bit, quant_mode=self.quant_mode)
         self.activation_dropout = config.activation_dropout
 
-        self.self_attn_layer_norm = nn.LayerNorm(self.embed_dim)
-        self.encoder_attn = IBartAttention(
+        self.self_attn_layer_norm = IntLayerNorm(
             self.embed_dim,
-            config.decoder_attention_heads,
+            eps=1e-5,
+            output_bit=self.ln_output_bit,
+            quant_mode=self.quant_mode,
+            force_dequant=self.force_dequant,
+        )
+        self.encoder_attn = IBartAttention(
+            embed_dim=self.embed_dim,
+            num_heads=config.encoder_attention_heads,
             dropout=config.attention_dropout,
             is_decoder=True,
+            quant_mode=self.quant_mode,
+            force_dequant=self.force_dequant,
         )
-        self.encoder_attn_layer_norm = nn.LayerNorm(self.embed_dim)
-        self.fc1 = nn.Linear(self.embed_dim, config.decoder_ffn_dim)
-        self.fc2 = nn.Linear(config.decoder_ffn_dim, self.embed_dim)
-        self.final_layer_norm = nn.LayerNorm(self.embed_dim)
+        self.encoder_attn_layer_norm = IntLayerNorm(
+            self.embed_dim,
+            eps=1e-5,
+            output_bit=self.ln_output_bit,
+            quant_mode=self.quant_mode,
+            force_dequant=self.force_dequant,
+        )
+        self.fc1 = QuantLinear(
+            self.embed_dim,
+            config.decoder_ffn_dim,
+            bias=True,
+            weight_bit=self.weight_bit,
+            bias_bit=self.bias_bit,
+            quant_mode=self.quant_mode,
+            per_channel=True,
+        )
+        self.fc2 = QuantLinear(
+            config.decoder_ffn_dim,
+            self.embed_dim,
+            bias=True,
+            weight_bit=self.weight_bit,
+            bias_bit=self.bias_bit,
+            quant_mode=self.quant_mode,
+            per_channel=True,
+        )
+        self.final_layer_norm = IntLayerNorm(
+            self.embed_dim,
+            eps=1e-5,
+            output_bit=self.ln_output_bit,
+            quant_mode=self.quant_mode,
+            force_dequant=self.force_dequant,
+        )
 
     def forward(
         self,
@@ -500,7 +553,7 @@ class IBartDecoderLayer(nn.Module):
         # decoder uni-directional self-attention cached key/values tuple is at positions 1,2
         self_attn_past_key_value = past_key_value[:2] if past_key_value is not None else None
         # add present self-attn cache to positions 1,2 of present_key_value tuple
-        hidden_states, self_attn_weights, present_key_value = self.self_attn(
+        hidden_states, self_attn_weights, present_key_value, hidden_states_scaling_factor = self.self_attn(
             hidden_states=hidden_states,
             past_key_value=self_attn_past_key_value,
             attention_mask=attention_mask,
@@ -509,7 +562,9 @@ class IBartDecoderLayer(nn.Module):
         )
         hidden_states = F.dropout(hidden_states, p=self.dropout, training=self.training)
         hidden_states = residual + hidden_states
-        hidden_states = self.self_attn_layer_norm(hidden_states)
+        hidden_states, hidden_states_scaling_factor = self.self_attn_layer_norm(
+            hidden_states, hidden_states_scaling_factor
+        )
 
         # Cross-Attention Block
         cross_attn_present_key_value = None
@@ -519,29 +574,40 @@ class IBartDecoderLayer(nn.Module):
 
             # cross_attn cached key/values tuple is at positions 3,4 of present_key_value tuple
             cross_attn_past_key_value = past_key_value[-2:] if past_key_value is not None else None
-            hidden_states, cross_attn_weights, cross_attn_present_key_value = self.encoder_attn(
-                hidden_states=hidden_states,
-                key_value_states=encoder_hidden_states,
-                attention_mask=encoder_attention_mask,
-                layer_head_mask=encoder_layer_head_mask,
-                past_key_value=cross_attn_past_key_value,
-                output_attentions=output_attentions,
+            hidden_states, cross_attn_weights, cross_attn_present_key_value, hidden_states_scaling_factor = (
+                self.encoder_attn(
+                    hidden_states=hidden_states,
+                    key_value_states=encoder_hidden_states,
+                    attention_mask=encoder_attention_mask,
+                    layer_head_mask=encoder_layer_head_mask,
+                    past_key_value=cross_attn_past_key_value,
+                    output_attentions=output_attentions,
+                )
             )
             hidden_states = F.dropout(hidden_states, p=self.dropout, training=self.training)
             hidden_states = residual + hidden_states
-            hidden_states = self.encoder_attn_layer_norm(hidden_states)
+            hidden_states, hidden_states_scaling_factor = self.encoder_attn_layer_norm(
+                hidden_states, hidden_states_scaling_factor
+            )
 
             # add cross-attn to positions 3,4 of present_key_value tuple
             present_key_value = present_key_value + cross_attn_present_key_value
 
         # Fully Connected
         residual = hidden_states
-        hidden_states = self.activation_fn(self.fc1(hidden_states))
+        hidden_states, hidden_states_scaling_factor = self.fc1(hidden_states, hidden_states_scaling_factor)
+        hidden_states, hidden_states_scaling_factor = self.activation_fn(hidden_states, hidden_states_scaling_factor)
+        # Requantization: 32bit -> 8-bit
+        hidden_states, hidden_states_scaling_factor = self.quant_activation_fn(
+            hidden_states, hidden_states_scaling_factor
+        )
         hidden_states = F.dropout(hidden_states, p=self.activation_dropout, training=self.training)
-        hidden_states = self.fc2(hidden_states)
+        hidden_states, hidden_states_scaling_factor = self.fc2(hidden_states, hidden_states_scaling_factor)
         hidden_states = F.dropout(hidden_states, p=self.dropout, training=self.training)
         hidden_states = residual + hidden_states
-        hidden_states = self.final_layer_norm(hidden_states)
+        hidden_states, hidden_states_scaling_factor = self.final_layer_norm(
+            hidden_states, hidden_states_scaling_factor
+        )
 
         outputs = (hidden_states,)
 
@@ -580,18 +646,21 @@ class IBartClassificationHead(nn.Module):
 
 class IBartPreTrainedModel(PreTrainedModel):
     config_class = IBartConfig
-    base_model_prefix = "model"
+    base_model_prefix = "ibart"
 
     def _init_weights(self, module):
         std = self.config.init_std
-        if isinstance(module, nn.Linear):
+        if isinstance(module, (QuantLinear, nn.Linear)):
             module.weight.data.normal_(mean=0.0, std=std)
             if module.bias is not None:
                 module.bias.data.zero_()
-        elif isinstance(module, nn.Embedding):
+        elif isinstance(module, (QuantEmbedding, nn.Embedding)):
             module.weight.data.normal_(mean=0.0, std=std)
             if module.padding_idx is not None:
                 module.weight.data[module.padding_idx].zero_()
+        elif isinstance(module, (IntLayerNorm, nn.LayerNorm)):
+            module.bias.data.zero_()
+            module.weight.data.fill_(1.0)
 
     @property
     def dummy_inputs(self):
@@ -755,6 +824,9 @@ class IBartEncoder(IBartPreTrainedModel):
 
     def __init__(self, config: IBartConfig, embed_tokens: Optional[nn.Embedding] = None):
         super().__init__(config)
+        self.quant_mode = config.quant_mode
+        self.embedding_bit = 8
+        self.ln_output_bit = 32
 
         self.dropout = config.dropout
         self.layerdrop = config.encoder_layerdrop
@@ -767,14 +839,26 @@ class IBartEncoder(IBartPreTrainedModel):
         if embed_tokens is not None:
             self.embed_tokens = embed_tokens
         else:
-            self.embed_tokens = nn.Embedding(config.vocab_size, embed_dim, self.padding_idx)
+            self.embed_tokens = QuantEmbedding(
+                config.vocab_size,
+                config.d_model,
+                self.padding_idx,
+                weight_bit=self.embedding_bit,
+                quant_mode=self.quant_mode,
+            )
 
         self.embed_positions = IBartLearnedPositionalEmbedding(
             config.max_position_embeddings,
             embed_dim,
         )
         self.layers = nn.ModuleList([IBartEncoderLayer(config) for _ in range(config.encoder_layers)])
-        self.layernorm_embedding = nn.LayerNorm(embed_dim)
+        self.layernorm_embedding = IntLayerNorm(
+            embed_dim,
+            eps=1e-5,
+            output_bit=self.ln_output_bit,
+            quant_mode=self.quant_mode,
+            force_dequant=config.force_dequant,
+        )
 
         self.init_weights()
 
@@ -847,7 +931,7 @@ class IBartEncoder(IBartPreTrainedModel):
         embed_pos = self.embed_positions(input_shape)
 
         hidden_states = inputs_embeds + embed_pos
-        hidden_states = self.layernorm_embedding(hidden_states)
+        hidden_states, hidden_states_scaling_factor = self.layernorm_embedding(hidden_states)
         hidden_states = F.dropout(hidden_states, p=self.dropout, training=self.training)
 
         # expand attention_mask
@@ -920,6 +1004,10 @@ class IBartDecoder(IBartPreTrainedModel):
 
     def __init__(self, config: IBartConfig, embed_tokens: Optional[nn.Embedding] = None):
         super().__init__(config)
+        self.quant_mode = config.quant_mode
+        self.embedding_bit = 8
+        self.ln_output_bit = 32
+
         self.dropout = config.dropout
         self.layerdrop = config.decoder_layerdrop
         self.padding_idx = config.pad_token_id
@@ -929,14 +1017,26 @@ class IBartDecoder(IBartPreTrainedModel):
         if embed_tokens is not None:
             self.embed_tokens = embed_tokens
         else:
-            self.embed_tokens = nn.Embedding(config.vocab_size, config.d_model, self.padding_idx)
+            self.embed_tokens = QuantEmbedding(
+                config.vocab_size,
+                config.d_model,
+                self.padding_idx,
+                weight_bit=self.embedding_bit,
+                quant_mode=self.quant_mode,
+            )
 
         self.embed_positions = IBartLearnedPositionalEmbedding(
             config.max_position_embeddings,
             config.d_model,
         )
         self.layers = nn.ModuleList([IBartDecoderLayer(config) for _ in range(config.decoder_layers)])
-        self.layernorm_embedding = nn.LayerNorm(config.d_model)
+        self.layernorm_embedding = IntLayerNorm(
+            config.d_model,
+            eps=1e-5,
+            output_bit=self.ln_output_bit,
+            quant_mode=self.quant_mode,
+            force_dequant=config.force_dequant,
+        )
 
         self.init_weights()
 
@@ -1178,8 +1278,16 @@ class IBartModel(IBartPreTrainedModel):
     def __init__(self, config: IBartConfig):
         super().__init__(config)
 
+        self.quant_mode = config.quant_mode
+
         padding_idx, vocab_size = config.pad_token_id, config.vocab_size
-        self.shared = nn.Embedding(vocab_size, config.d_model, padding_idx)
+        self.shared = QuantEmbedding(
+            vocab_size,
+            config.d_model,
+            padding_idx,
+            weight_bit=self.embedding_bit,
+            quant_mode=self.quant_mode,
+        )
 
         self.encoder = IBartEncoder(config, self.shared)
         self.decoder = IBartDecoder(config, self.shared)
@@ -1663,6 +1771,7 @@ class IBartForQuestionAnswering(IBartPreTrainedModel):
             encoder_hidden_states=outputs.encoder_hidden_states,
             encoder_attentions=outputs.encoder_attentions,
         )
+
 
 class IBartDecoderWrapper(IBartPreTrainedModel):
     """
