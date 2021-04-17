@@ -118,7 +118,7 @@ class IBartLearnedPositionalEmbedding(nn.Embedding):
         """`input_ids_shape` is expected to be [bsz x seqlen]."""
         bsz, seq_len = input_ids_shape[:2]
         positions = torch.arange(
-            past_key_values_length, past_key_values_length + seq_len, dtype=torch.long, device=self.weight.device
+            past_key_values_length, past_key_values_length + seq_len, dtype=torch.int32, device=self.weight.device
         )
         return super().forward(positions)
 
