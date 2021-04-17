@@ -133,16 +133,16 @@ from ..funnel.modeling_funnel import (
     FunnelModel,
 )
 from ..gpt2.modeling_gpt2 import GPT2ForSequenceClassification, GPT2LMHeadModel, GPT2Model
+from ..gpt_neo.modeling_gpt_neo import GPTNeoForCausalLM, GPTNeoModel
 
 # Add modeling imports here
 from ..ibart.modeling_ibart import (
-    IBartForConditionalGeneration,
     IBartForCausalLM,
+    IBartForConditionalGeneration,
     IBartForQuestionAnswering,
     IBartForSequenceClassification,
     IBartModel,
 )
-from ..gpt_neo.modeling_gpt_neo import GPTNeoForCausalLM, GPTNeoModel
 from ..ibert.modeling_ibert import (
     IBertForMaskedLM,
     IBertForMultipleChoice,
@@ -276,7 +276,6 @@ from ..xlnet.modeling_xlnet import (
 )
 from .auto_factory import auto_class_factory
 from .configuration_auto import (
-    IBartConfig,
     AlbertConfig,
     BartConfig,
     BertConfig,
@@ -298,6 +297,7 @@ from .configuration_auto import (
     FunnelConfig,
     GPT2Config,
     GPTNeoConfig,
+    IBartConfig,
     IBertConfig,
     LayoutLMConfig,
     LEDConfig,
@@ -427,7 +427,6 @@ MODEL_FOR_PRETRAINING_MAPPING = OrderedDict(
 MODEL_WITH_LM_HEAD_MAPPING = OrderedDict(
     [
         # Model with LM heads mapping
-
         (IBartConfig, IBartForConditionalGeneration),
         (GPTNeoConfig, GPTNeoForCausalLM),
         (BigBirdConfig, BigBirdForMaskedLM),
@@ -543,7 +542,6 @@ MODEL_FOR_MASKED_LM_MAPPING = OrderedDict(
 MODEL_FOR_SEQ_TO_SEQ_CAUSAL_LM_MAPPING = OrderedDict(
     [
         # Model for Seq2Seq Causal LM mapping
-
         (IBartConfig, IBartForConditionalGeneration),
         (M2M100Config, M2M100ForConditionalGeneration),
         (LEDConfig, LEDForConditionalGeneration),

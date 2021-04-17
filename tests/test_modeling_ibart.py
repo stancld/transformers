@@ -33,17 +33,14 @@ if is_torch_available():
 
     from transformers import (
         IBartConfig,
+        IBartForCausalLM,
         IBartForConditionalGeneration,
         IBartForQuestionAnswering,
-        IBartForCausalLM,
         IBartForSequenceClassification,
         IBartModel,
         IBartTokenizer,
     )
-    from transformers.models.ibart.modeling_ibart import (
-        IBartDecoder,
-        IBartEncoder,
-    )
+    from transformers.models.ibart.modeling_ibart import IBartDecoder, IBartEncoder
 
 
 def prepare_ibart_inputs_dict(
@@ -156,7 +153,9 @@ class IBartModelTester:
         next_attention_mask = torch.cat([attention_mask, next_attn_mask], dim=-1)
 
         output_from_no_past = model(next_input_ids, attention_mask=next_attention_mask)["last_hidden_state"]
-        output_from_past = model(next_tokens, attention_mask=next_attention_mask, past_key_values=past_key_values)["last_hidden_state"]
+        output_from_past = model(next_tokens, attention_mask=next_attention_mask, past_key_values=past_key_values)[
+            "last_hidden_state"
+        ]
 
         # select random slice
         random_slice_idx = ids_tensor((1,), output_from_past.shape[-1]).item()
@@ -313,10 +312,10 @@ TOLERANCE = 1e-4
 class IBartModelIntegrationTests(unittest.TestCase):
     @cached_property
     def default_tokenizer(self):
-        return IBartTokenizer.from_pretrained('brand-new-bert-base-cased')
+        return IBartTokenizer.from_pretrained("brand-new-bert-base-cased")
 
     def test_inference_no_head(self):
-        model = IBartModel.from_pretrained('brand-new-bert-base-cased').to(torch_device)
+        model = IBartModel.from_pretrained("brand-new-bert-base-cased").to(torch_device)
         input_ids = _long_tensor([[0, 31414, 232, 328, 740, 1140, 12695, 69, 46078, 1588, 2]])
         decoder_input_ids = _long_tensor([[2, 0, 31414, 232, 328, 740, 1140, 12695, 69, 46078, 1588]])
         inputs_dict = prepare_ibart_inputs_dict(model.config, input_ids, decoder_input_ids)
@@ -331,7 +330,7 @@ class IBartModelIntegrationTests(unittest.TestCase):
         self.assertTrue(torch.allclose(output[:, :3, :3], expected_slice, atol=TOLERANCE))
 
     def test_inference_head(self):
-        model = IBartForConditionalGeneration.from_pretrained('brand-new-bert-base-cased').to(torch_device)
+        model = IBartForConditionalGeneration.from_pretrained("brand-new-bert-base-cased").to(torch_device)
 
         # change to intended input
         input_ids = _long_tensor([[0, 31414, 232, 328, 740, 1140, 12695, 69, 46078, 1588, 2]])
@@ -348,8 +347,8 @@ class IBartModelIntegrationTests(unittest.TestCase):
         self.assertTrue(torch.allclose(output[:, :3, :3], expected_slice, atol=TOLERANCE))
 
     def test_seq_to_seq_generation(self):
-        hf = IBartForConditionalGeneration.from_pretrained('brand-new-bert-base-cased').to(torch_device)
-        tok = IBartTokenizer.from_pretrained('brand-new-bert-base-cased')
+        hf = IBartForConditionalGeneration.from_pretrained("brand-new-bert-base-cased").to(torch_device)
+        tok = IBartTokenizer.from_pretrained("brand-new-bert-base-cased")
 
         batch_input = [
             # string 1,

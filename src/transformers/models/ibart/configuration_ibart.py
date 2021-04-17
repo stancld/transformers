@@ -27,12 +27,11 @@ IBART_PRETRAINED_CONFIG_ARCHIVE_MAP = {
 
 class IBartConfig(PretrainedConfig):
     r"""
-    This is the configuration class to store the configuration of a :class:`~transformers.IBartModel`.
-    It is used to instantiate an IBART model according to the specified arguments.
+    This is the configuration class to store the configuration of a :class:`~transformers.IBartModel`. It is used to
+    instantiate an IBART model according to the specified arguments.
 
-    Configuration objects inherit from  :class:`~transformers.PretrainedConfig` and can be used
-    to control the model outputs. Read the documentation from  :class:`~transformers.PretrainedConfig`
-    for more information.
+    Configuration objects inherit from :class:`~transformers.PretrainedConfig` and can be used to control the model
+    outputs. Read the documentation from :class:`~transformers.PretrainedConfig` for more information.
 
 
     Args:
@@ -86,6 +85,7 @@ class IBartConfig(PretrainedConfig):
             deafult, it is set as :obj:`"none"`, which does not dequantize any layers. Please specify :obj:`"gelu"`,
             :obj:`"softmax"`, or :obj:`"layernorm"` to dequantize GELU, Softmax, or LayerNorm, respectively.
             :obj:`"nonlinear"` will dequantize all nonlinear layers, i.e., GELU, Softmax, and LayerNorm.
+
         Example::
 
         >>> from transformers import IBartModel, IBartConfig
@@ -139,7 +139,7 @@ class IBartConfig(PretrainedConfig):
             eos_token_id=eos_token_id,
             is_encoder_decoder=is_encoder_decoder,
             decoder_start_token_id=decoder_start_token_id,
-            **kwargs
+            **kwargs,
         )
 
         self.vocab_size = vocab_size
@@ -165,7 +165,6 @@ class IBartConfig(PretrainedConfig):
         self.scale_embedding = scale_embedding  # scale factor will be sqrt(d_model) if True
         self.quant_mode = quant_mode
         self.force_dequant = force_dequant
-
 
     @property
     def num_attention_heads(self) -> int:

@@ -130,7 +130,6 @@ _import_structure = {
         "load_tf2_weights_in_pytorch_model",
     ],
     # Models
-    "models.ibart": ["IBART_PRETRAINED_CONFIG_ARCHIVE_MAP", "IBartConfig", "IBartTokenizer"],
     "models": [],
     "models.albert": ["ALBERT_PRETRAINED_CONFIG_ARCHIVE_MAP", "AlbertConfig"],
     "models.auto": [
@@ -184,6 +183,7 @@ _import_structure = {
     "models.gpt2": ["GPT2_PRETRAINED_CONFIG_ARCHIVE_MAP", "GPT2Config", "GPT2Tokenizer"],
     "models.gpt_neo": ["GPT_NEO_PRETRAINED_CONFIG_ARCHIVE_MAP", "GPTNeoConfig"],
     "models.herbert": ["HerbertTokenizer"],
+    "models.ibart": ["IBART_PRETRAINED_CONFIG_ARCHIVE_MAP", "IBartConfig", "IBartTokenizer"],
     "models.ibert": ["IBERT_PRETRAINED_CONFIG_ARCHIVE_MAP", "IBertConfig"],
     "models.layoutlm": ["LAYOUTLM_PRETRAINED_CONFIG_ARCHIVE_MAP", "LayoutLMConfig", "LayoutLMTokenizer"],
     "models.led": ["LED_PRETRAINED_CONFIG_ARCHIVE_MAP", "LEDConfig", "LEDTokenizer"],
@@ -442,17 +442,6 @@ if is_torch_available():
     _import_structure["modeling_utils"] = ["Conv1D", "PreTrainedModel", "apply_chunking_to_forward", "prune_layer"]
     # PyTorch models structure
 
-    _import_structure["models.ibart"].extend(
-        [
-            "IBART_PRETRAINED_MODEL_ARCHIVE_LIST",
-            "IBartForCausalLM",
-            "IBartForConditionalGeneration",
-            "IBartForQuestionAnswering",
-            "IBartForSequenceClassification",
-            "IBartModel",
-        ]
-    )
-
     _import_structure["models.albert"].extend(
         [
             "ALBERT_PRETRAINED_MODEL_ARCHIVE_LIST",
@@ -467,6 +456,7 @@ if is_torch_available():
             "load_tf_weights_in_albert",
         ]
     )
+
     _import_structure["models.auto"].extend(
         [
             "MODEL_FOR_CAUSAL_LM_MAPPING",
@@ -706,6 +696,16 @@ if is_torch_available():
             "GPTNeoModel",
             "GPTNeoPreTrainedModel",
             "load_tf_weights_in_gpt_neo",
+        ]
+    )
+    _import_structure["models.ibart"].extend(
+        [
+            "IBART_PRETRAINED_MODEL_ARCHIVE_LIST",
+            "IBartForCausalLM",
+            "IBartForConditionalGeneration",
+            "IBartForQuestionAnswering",
+            "IBartForSequenceClassification",
+            "IBartModel",
         ]
     )
     _import_structure["models.ibert"].extend(
@@ -1469,7 +1469,6 @@ if TYPE_CHECKING:
         load_tf2_weights_in_pytorch_model,
     )
     from .models.albert import ALBERT_PRETRAINED_CONFIG_ARCHIVE_MAP, AlbertConfig
-    from .models.ibart import IBART_PRETRAINED_CONFIG_ARCHIVE_MAP, IBartConfig, IBartTokenizer
     from .models.auto import (
         ALL_PRETRAINED_CONFIG_ARCHIVE_MAP,
         CONFIG_MAPPING,
@@ -1520,6 +1519,7 @@ if TYPE_CHECKING:
     from .models.gpt2 import GPT2_PRETRAINED_CONFIG_ARCHIVE_MAP, GPT2Config, GPT2Tokenizer
     from .models.gpt_neo import GPT_NEO_PRETRAINED_CONFIG_ARCHIVE_MAP, GPTNeoConfig
     from .models.herbert import HerbertTokenizer
+    from .models.ibart import IBART_PRETRAINED_CONFIG_ARCHIVE_MAP, IBartConfig, IBartTokenizer
     from .models.ibert import IBERT_PRETRAINED_CONFIG_ARCHIVE_MAP, IBertConfig
     from .models.layoutlm import LAYOUTLM_PRETRAINED_CONFIG_ARCHIVE_MAP, LayoutLMConfig, LayoutLMTokenizer
     from .models.led import LED_PRETRAINED_CONFIG_ARCHIVE_MAP, LEDConfig, LEDTokenizer
@@ -1636,7 +1636,6 @@ if TYPE_CHECKING:
         from .utils.dummy_sentencepiece_objects import *
 
     if is_tokenizers_available():
-        from .models.ibart import IBartTokenizerFast
         from .models.albert import AlbertTokenizerFast
         from .models.bart import BartTokenizerFast
         from .models.barthez import BarthezTokenizerFast
@@ -1649,6 +1648,7 @@ if TYPE_CHECKING:
         from .models.funnel import FunnelTokenizerFast
         from .models.gpt2 import GPT2TokenizerFast
         from .models.herbert import HerbertTokenizerFast
+        from .models.ibart import IBartTokenizerFast
         from .models.layoutlm import LayoutLMTokenizerFast
         from .models.led import LEDTokenizerFast
         from .models.longformer import LongformerTokenizerFast
@@ -1695,15 +1695,6 @@ if TYPE_CHECKING:
 
     # Modeling
     if is_torch_available():
-
-        from .models.ibart import (
-            IBART_PRETRAINED_MODEL_ARCHIVE_LIST,
-            IBartForConditionalGeneration,
-            IBartForCausalLM,
-            IBartForQuestionAnswering,
-            IBartForSequenceClassification,
-            IBartModel,
-        )
 
         # Benchmarks
         from .benchmark.benchmark import PyTorchBenchmark
@@ -1970,6 +1961,14 @@ if TYPE_CHECKING:
             GPTNeoModel,
             GPTNeoPreTrainedModel,
             load_tf_weights_in_gpt_neo,
+        )
+        from .models.ibart import (
+            IBART_PRETRAINED_MODEL_ARCHIVE_LIST,
+            IBartForCausalLM,
+            IBartForConditionalGeneration,
+            IBartForQuestionAnswering,
+            IBartForSequenceClassification,
+            IBartModel,
         )
         from .models.ibert import (
             IBERT_PRETRAINED_MODEL_ARCHIVE_LIST,

@@ -15,8 +15,8 @@
 """ PyTorch I-BART model. """
 
 
-import math
 import copy
+import math
 import random
 from typing import Optional, Tuple
 
@@ -35,16 +35,16 @@ from ...file_utils import (
 from ...modeling_outputs import (
     BaseModelOutput,
     BaseModelOutputWithPastAndCrossAttentions,
+    CausalLMOutputWithCrossAttentions,
     Seq2SeqLMOutput,
     Seq2SeqModelOutput,
     Seq2SeqQuestionAnsweringModelOutput,
     Seq2SeqSequenceClassifierOutput,
-    CausalLMOutputWithCrossAttentions
 )
 from ...modeling_utils import PreTrainedModel
 from ...utils import logging
-from .configuration_ibart import IBartConfig
 from ..ibert.quant_modules import IntGELU, IntLayerNorm, IntSoftmax, QuantAct, QuantEmbedding, QuantLinear
+from .configuration_ibart import IBartConfig
 
 
 logger = logging.get_logger(__name__)
@@ -90,9 +90,7 @@ def _make_causal_mask(input_ids_shape: torch.Size, dtype: torch.dtype, past_key_
     return mask[None, None, :, :].expand(bsz, 1, tgt_len, tgt_len + past_key_values_length)
 
 
-def _expand_mask(
-    mask: torch.Tensor, dtype: torch.dtype, tgt_len: Optional[int] = None
-):
+def _expand_mask(mask: torch.Tensor, dtype: torch.dtype, tgt_len: Optional[int] = None):
     """
     Expands attention_mask from `[bsz, seq_len]` to `[bsz, 1, tgt_seq_len, src_seq_len]`.
     """
@@ -221,7 +219,9 @@ class IBartAttention(nn.Module):
         bsz, tgt_len, embed_dim = hidden_states.size()
 
         # get query proj
-        mixed_query_states, mixed_query_states_scaling_factor = self.q_proj(hidden_states, hidden_states_scaling_factor)
+        mixed_query_states, mixed_query_states_scaling_factor = self.q_proj(
+            hidden_states, hidden_states_scaling_factor
+        )
         # get key, value proj
         if is_cross_attention and past_key_value is not None:
             # reuse k,v, cross_attentions
@@ -429,7 +429,9 @@ class IBartEncoderLayer(nn.Module):
         hidden_states, hidden_states_scaling_factor = self.fc1(hidden_states, hidden_states_scaling_factor)
         hidden_states, hidden_states_scaling_factor = self.activation_fn(hidden_states, hidden_states_scaling_factor)
         # Requantization: 32bit -> 8-bit
-        hidden_states, hidden_states_scaling_factor = self.quant_activation_fn(hidden_states, hidden_states_scaling_factor)
+        hidden_states, hidden_states_scaling_factor = self.quant_activation_fn(
+            hidden_states, hidden_states_scaling_factor
+        )
         hidden_states = F.dropout(hidden_states, p=self.activation_dropout, training=self.training)
         hidden_states, hidden_states_scaling_factor = self.fc2(hidden_states, hidden_states_scaling_factor)
         hidden_states = F.dropout(hidden_states, p=self.dropout, training=self.training)
@@ -438,7 +440,9 @@ class IBartEncoderLayer(nn.Module):
             hidden_states, hidden_states_scaling_factor
         )
 
-        if hidden_states.dtype == torch.float16 and (torch.isinf(hidden_states).any() or torch.isnan(hidden_states).any()):
+        if hidden_states.dtype == torch.float16 and (
+            torch.isinf(hidden_states).any() or torch.isnan(hidden_states).any()
+        ):
             clamp_value = torch.finfo(hidden_states.dtype).max - 1000
             hidden_states = torch.clamp(hidden_states, min=-clamp_value, max=clamp_value)
 
@@ -447,7 +451,7 @@ class IBartEncoderLayer(nn.Module):
         if output_attentions:
             outputs += (attn_weights,)
 
-        outputs += (hidden_states_scaling_factor, )
+        outputs += (hidden_states_scaling_factor,)
 
         return outputs
 
@@ -584,16 +588,19 @@ class IBartDecoderLayer(nn.Module):
 
             # cross_attn cached key/values tuple is at positions 3,4 of present_key_value tuple
             cross_attn_past_key_value = past_key_value[-2:] if past_key_value is not None else None
-            hidden_states, cross_attn_weights, cross_attn_present_key_value, hidden_states_scaling_factor = (
-                self.encoder_attn(
-                    hidden_states=hidden_states,
-                    hidden_states_scaling_factor=hidden_states_scaling_factor,
-                    key_value_states=encoder_hidden_states,
-                    attention_mask=encoder_attention_mask,
-                    layer_head_mask=encoder_layer_head_mask,
-                    past_key_value=cross_attn_past_key_value,
-                    output_attentions=output_attentions,
-                )
+            (
+                hidden_states,
+                cross_attn_weights,
+                cross_attn_present_key_value,
+                hidden_states_scaling_factor,
+            ) = self.encoder_attn(
+                hidden_states=hidden_states,
+                hidden_states_scaling_factor=hidden_states_scaling_factor,
+                key_value_states=encoder_hidden_states,
+                attention_mask=encoder_attention_mask,
+                layer_head_mask=encoder_layer_head_mask,
+                past_key_value=cross_attn_past_key_value,
+                output_attentions=output_attentions,
             )
             hidden_states = F.dropout(hidden_states, p=self.dropout, training=self.training)
             hidden_states = residual + hidden_states
@@ -695,10 +702,9 @@ IBART_START_DOCSTRING = r"""
 
     Parameters:
         config (:class:`~transformers.IBartConfig`):
-            Model configuration class with all the parameters of the model.
-            Initializing with a config file does not load the weights associated with the model, only the
-            configuration. Check out the :meth:`~transformers.PreTrainedModel.from_pretrained` method to load the model
-            weights.
+            Model configuration class with all the parameters of the model. Initializing with a config file does not
+            load the weights associated with the model, only the configuration. Check out the
+            :meth:`~transformers.PreTrainedModel.from_pretrained` method to load the model weights.
 """
 
 IBART_GENERATION_EXAMPLE = r"""
@@ -903,6 +909,7 @@ class IBartEncoder(IBartPreTrainedModel):
                 `What are attention masks? <../glossary.html#attention-mask>`__
             head_mask (:obj:`torch.Tensor` of shape :obj:`(num_layers, num_heads)`, `optional`):
                 Mask to nullify selected heads of the attention modules. Mask values selected in ``[0, 1]``:
+
                 - 1 indicates the head is **not masked**,
                 - 0 indicates the heas is **masked**.
 
@@ -1183,7 +1190,9 @@ class IBartDecoder(IBartPreTrainedModel):
             inputs_embeds, hidden_states_scaling_factor = self.embed_tokens(input_ids)
             inputs_embeds *= self.embed_scale
 
-        attention_mask = self._prepare_decoder_attention_mask(attention_mask, input_shape, inputs_embeds, past_key_values_length)
+        attention_mask = self._prepare_decoder_attention_mask(
+            attention_mask, input_shape, inputs_embeds, past_key_values_length
+        )
 
         # expand encoder attention mask
         if encoder_hidden_states is not None and encoder_attention_mask is not None:
@@ -1225,7 +1234,9 @@ class IBartDecoder(IBartPreTrainedModel):
             if getattr(self.config, "gradient_checkpointing", False) and self.training:
 
                 if use_cache:
-                    logger.warning("`use_cache = True` is incompatible with `config.gradient_checkpointing = True`. Setting `use_cache = False`...")
+                    logger.warning(
+                        "`use_cache = True` is incompatible with `config.gradient_checkpointing = True`. Setting `use_cache = False`..."
+                    )
                     use_cache = False
 
                 def create_custom_forward(module):
@@ -1512,7 +1523,9 @@ class IBartForConditionalGeneration(IBartPreTrainedModel):
 
         if labels is not None:
             if decoder_input_ids is None:
-                decoder_input_ids = shift_tokens_right(labels, self.config.pad_token_id, self.config.decoder_start_token_id)
+                decoder_input_ids = shift_tokens_right(
+                    labels, self.config.pad_token_id, self.config.decoder_start_token_id
+                )
 
         outputs = self.model(
             input_ids,

@@ -17,7 +17,6 @@
 # limitations under the License.
 
 from . import (
-    ibart,
     albert,
     auto,
     bart,
@@ -44,6 +43,7 @@ from . import (
     gpt2,
     gpt_neo,
     herbert,
+    ibart,
     layoutlm,
     led,
     longformer,
