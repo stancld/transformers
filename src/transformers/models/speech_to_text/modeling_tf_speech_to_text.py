@@ -208,8 +208,8 @@ class TFSpeech2TextSinusoidalPositionalEmbedding(tf.keras.layers.Layer):
         symbols are ignored. This is modified from fairseq's `utils.make_positions`.
 
         Args:
-            x: torch.Tensor x:
-        Returns: torch.Tensor
+            x: tf.Tensor x:
+        Returns: tf.Tensor
         """
         # The series of casts and type-conversions here are carefully balanced to both work with ONNX export and XLA.
         mask = tf.where(input_ids != padding_idx, 1, 0)
@@ -365,3 +365,193 @@ class TFSpeech2TextAttention(tf.keras.layers.Layer):
         attn_weights: tf.Tensor = tf.reshape(attn_weights, (bsz, self.num_heads, tgt_len, src_len))
 
         return attn_output, attn_weights, past_key_value
+
+
+class Speech2TextEncoderLayer(tf.keras.layers.Layer):
+    def __init__(self, config: Speech2TextConfig):
+        super().__init__()
+        self.embed_dim = config.d_model
+        self.self_attn = TFSpeech2TextAttention(
+            embed_dim=self.embed_dim,
+            num_heads=config.encoder_attention_heads,
+            dropout=config.attention_dropout,
+            name="self_attn"
+        )
+        self.self_attn_layer_norm = tf.keras.layers.LayerNormalization(epsilon=1e-5, name="self_attn_layer_norm")
+        self.dropout = tf.keras.layers.Dropout(config.dropout)
+        self.activation_fn = get_tf_activation(config.activation_function)
+        self.activation_dropout = tf.keras.layers.Dropout(config.activation_dropout)
+        self.fc1 = tf.keras.layers.Dense(config.encoder_ffn_dim, name="fc1")
+        self.fc2 = tf.keras.layers.Dense(self.embed_dim, name="fc2")
+        self.final_layer_norm = tf.keras.layers.LayerNormalization(epsilon=1e-5, name="final_layer_norm")
+
+    def forward(
+        self,
+        hidden_states: tf.Tensor,
+        attention_mask: tf.Tensor,
+        layer_head_mask: tf.Tensor,
+        output_attentions: bool = False,
+        training: bool = False,
+    ):
+        """
+        Args:
+            hidden_states (:obj:`tf.Tensor`): input to the layer of shape :obj:`(seq_len, batch, embed_dim)`
+            attention_mask (:obj:`tf.Tensor`): attention mask of size
+                :obj:`(batch, 1, tgt_len, src_len)` where padding elements are indicated by very large negative values.
+            layer_head_mask (:obj:`tf.Tensor`): mask for attention heads in a given layer of size
+                :obj:`(config.encoder_attention_heads,)`.
+            output_attentions (:obj:`bool`, `optional`):
+                Whether or not to return the attentions tensors of all attention layers. See ``attentions`` under
+                returned tensors for more detail.
+        """
+        residual = hidden_states
+        hidden_states = self.self_attn_layer_norm(hidden_states)
+        hidden_states, attn_weights, _ = self.self_attn(
+            hidden_states=hidden_states,
+            attention_mask=attention_mask,
+            layer_head_mask=layer_head_mask,
+            output_attentions=output_attentions,
+        )
+        # The tf.debugging asserts are not compliant with XLA then they
+        # have to be disabled in other modes than eager.
+        if tf.executing_eagerly():
+            tf.debugging.assert_equal(
+                shape_list(hidden_states),
+                shape_list(residual),
+                message=f"Self attn modified the shape of query {shape_list(residual)} to {shape_list(hidden_states)}",
+            )
+
+        hidden_states = self.dropout(hidden_states, training=training)
+        hidden_states = residual + hidden_states
+
+        residual = hidden_states
+        hidden_states = self.final_layer_norm(hidden_states)
+        hidden_states = self.activation_fn(self.fc1(hidden_states))
+        hidden_states = self.activation_dropout(hidden_states, training=training)
+        hidden_states = self.fc2(hidden_states)
+        hidden_states = self.dropout(hidden_states, training=training)
+        hidden_states = residual + hidden_states
+
+        outputs = (hidden_states,)
+
+        if output_attentions:
+            outputs += (attn_weights,)
+
+        return outputs
+
+
+class Speech2TextDecoderLayer(tf.keras.layers.Layer):
+    def __init__(self, config: Speech2TextConfig):
+        super().__init__()
+        self.embed_dim = config.d_model
+
+        self.self_attn = TFSpeech2TextAttention(
+            embed_dim=self.embed_dim,
+            num_heads=config.decoder_attention_heads,
+            dropout=config.attention_dropout,
+            is_decoder=True,
+        )
+        self.dropout = tf.keras.layers.Dropout(config.dropout)
+        self.activation_fn = get_tf_activation(config.activation_function)
+        self.activation_dropout = tf.keras.layers.Dropout(config.activation_dropout)
+
+        self.self_attn_layer_norm = tf.keras.layers.LayerNormalization(epsilon=1e-5, name="self_attn_layer_norm")
+        self.encoder_attn = TFSpeech2TextAttention(
+            self.embed_dim,
+            config.decoder_attention_heads,
+            dropout=config.attention_dropout,
+            is_decoder=True,
+        )
+        self.encoder_attn_layer_norm = tf.keras.layers.LayerNormalization(epsilon=1e-5, name="encoder_attn_layer_norm")
+        self.fc1 = tf.keras.layers.Dense(config.decoder_ffn_dim, name="fc1")
+        self.fc2 = tf.keras.layers.Dense(self.embed_dim, name="fc2")
+        self.final_layer_norm = tf.keras.layers.LayerNormalization(epsilon=1e-5, name="final_layer_norm")
+
+    def forward(
+        self,
+        hidden_states: tf.Tensor,
+        attention_mask: Optional[tf.Tensor] = None,
+        encoder_hidden_states: Optional[tf.Tensor] = None,
+        encoder_attention_mask: Optional[tf.Tensor] = None,
+        layer_head_mask: Optional[tf.Tensor] = None,
+        cross_attn_layer_head_mask: Optional[tf.Tensor] = None,
+        past_key_value: Optional[Tuple[tf.Tensor]] = None,
+        output_attentions: Optional[bool] = False,
+        use_cache: Optional[bool] = True,
+        training: Optional[bool] = True,
+    ):
+        """
+        Args:
+            hidden_states (:obj:`tf.Tensor`): input to the layer of shape :obj:`(seq_len, batch, embed_dim)`
+            attention_mask (:obj:`tf.Tensor`): attention mask of size
+                :obj:`(batch, 1, tgt_len, src_len)` where padding elements are indicated by very large negative values.
+            encoder_hidden_states (:obj:`tf.Tensor`): cross attention input to the layer of shape :obj:`(seq_len, batch, embed_dim)`
+            encoder_attention_mask (:obj:`tf.Tensor`): encoder attention mask of size
+                :obj:`(batch, 1, tgt_len, src_len)` where padding elements are indicated by very large negative values.
+            layer_head_mask (:obj:`tf.Tensor`): mask for attention heads in a given layer of size
+                :obj:`(encoder_attention_heads,)`.
+            cross_attn_layer_head_mask (:obj:`tf.Tensor`): mask for cross-attention heads in a given layer of
+                size `(decoder_attention_heads,)`.
+            past_key_value (:obj:`Tuple(tf.Tensor)`): cached past key and value projection states
+            output_attentions (:obj:`bool`, `optional`):
+                Whether or not to return the attentions tensors of all attention layers. See ``attentions`` under
+                returned tensors for more detail.
+        """
+        residual = hidden_states
+        hidden_states = self.self_attn_layer_norm(hidden_states)
+
+        # Self Attention
+        # decoder uni-directional self-attention cached key/values tuple is at positions 1,2
+        self_attn_past_key_value = past_key_value[:2] if past_key_value is not None else None
+        # add present self-attn cache to positions 1,2 of present_key_value tuple
+        hidden_states, self_attn_weights, present_key_value = self.self_attn(
+            hidden_states=hidden_states,
+            past_key_value=self_attn_past_key_value,
+            attention_mask=attention_mask,
+            layer_head_mask=layer_head_mask,
+            output_attentions=output_attentions,
+        )
+        hidden_states = self.dropout(hidden_states, training=training)
+        hidden_states = residual + hidden_states
+
+        # Cross-Attention Block
+        cross_attn_present_key_value = None
+        cross_attn_weights = None
+        if encoder_hidden_states is not None:
+            residual = hidden_states
+            hidden_states = self.encoder_attn_layer_norm(hidden_states)
+
+            # cross_attn cached key/values tuple is at positions 3,4 of present_key_value tuple
+            cross_attn_past_key_value = past_key_value[-2:] if past_key_value is not None else None
+            hidden_states, cross_attn_weights, cross_attn_present_key_value = self.encoder_attn(
+                hidden_states=hidden_states,
+                key_value_states=encoder_hidden_states,
+                attention_mask=encoder_attention_mask,
+                layer_head_mask=cross_attn_layer_head_mask,
+                past_key_value=cross_attn_past_key_value,
+                output_attentions=output_attentions,
+            )
+            hidden_states = self.dropout(hidden_states, training=training)
+            hidden_states = residual + hidden_states
+
+            # add cross-attn to positions 3,4 of present_key_value tuple
+            present_key_value = present_key_value + cross_attn_present_key_value
+
+        # Fully Connected
+        residual = hidden_states
+        hidden_states = self.final_layer_norm(hidden_states)
+        hidden_states = self.activation_fn(self.fc1(hidden_states))
+        hidden_states = self.activation_dropout(hidden_states, training=training)
+        hidden_states = self.fc2(hidden_states)
+        hidden_states = self.dropout(hidden_states, training=training)
+        hidden_states = residual + hidden_states
+
+        outputs = (hidden_states,)
+
+        if output_attentions:
+            outputs += (self_attn_weights, cross_attn_weights)
+
+        if use_cache:
+            outputs += (present_key_value,)
+
+        return outputs
