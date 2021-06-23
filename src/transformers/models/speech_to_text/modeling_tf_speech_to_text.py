@@ -555,3 +555,162 @@ class Speech2TextDecoderLayer(tf.keras.layers.Layer):
             outputs += (present_key_value,)
 
         return outputs
+
+
+class TFSpeech2TextPreTrainedModel(TFPreTrainedModel):
+    config_class = Speech2TextConfig
+    base_model_prefix = "model"
+
+    @property
+    def dummy_inputs(self) -> Dict[str, tf.Tensor]:
+        # TODO: Prepare this method
+        pass
+
+
+    def _init_weights(self, module):
+        # TODO: Convert this method into TensorFlow
+        std = self.config.init_std
+        if isinstance(module, (nn.Linear, nn.Conv1d)):
+            module.weight.data.normal_(mean=0.0, std=std)
+            if module.bias is not None:
+                module.bias.data.zero_()
+        elif isinstance(module, nn.Embedding):
+            module.weight.data.normal_(mean=0.0, std=std)
+            if module.padding_idx is not None:
+                module.weight.data[module.padding_idx].zero_()
+
+    def _get_subsampled_output_lengths(self, input_lengths: tf.Tensor):
+        """
+        Computes the output length of the convolutional layers
+        """
+
+        for i in range(self.config.num_conv_layers):
+            input_lengths = (input_lengths - 1) // 2 + 1
+
+        return input_lengths
+
+    def _get_subsampled_encoder_attn_mask(self, attention_mask: tf.Tensor):
+        # generate creates 3D attention mask, because of the shape of input_features
+        # convert it to 2D if thats the case
+        if len(attention_mask.shape) > 2:
+            attention_mask = attention_mask[:, :, -1]
+
+        subsampled_lengths = self._get_subsampled_output_lengths(attention_mask.sum(-1))
+        max_len = tf.math.reduce_max(subsampled_lengths)
+        bsz = attention_mask.shape[0]
+        attention_mask = tf.zeros((bsz, max_len), dtype=attention_mask.dtype)
+
+        # these two operations makes sure that all values
+        # before the output lengths indices are attended to
+        #TODO: Fix this - attention_mask[(torch.arange(bsz, device=attention_mask.device), subsampled_lengths - 1)] = 1
+        attention_mask = tf.reverse(tf.cumsum(tf.reverse(attention_mask, axis=[-1]), axis=-1), axis=[-1])
+        attention_mask = tf.cast(attention_mask, dtype=tf.int64)
+        return attention_mask
+
+
+SPEECH_TO_TEXT_START_DOCSTRING = r"""
+    This model inherits from :class:`~transformers.PreTrainedModel`. Check the superclass documentation for the generic
+    methods the library implements for all its model (such as downloading or saving, resizing the input embeddings,
+    pruning heads etc.)
+
+    This model is also a PyTorch `torch.nn.Module <https://pytorch.org/docs/stable/nn.html#torch.nn.Module>`__
+    subclass. Use it as a regular PyTorch Module and refer to the PyTorch documentation for all matter related to
+    general usage and behavior.
+
+    Parameters:
+        config (:class:`~transformers.Speech2TextConfig`):
+            Model configuration class with all the parameters of the model. Initializing with a config file does not
+            load the weights associated with the model, only the configuration. Check out the
+            :meth:`~transformers.PreTrainedModel.from_pretrained` method to load the model weights.
+"""
+
+SPEECH_TO_TEXT_INPUTS_DOCSTRING = r"""
+    Args:
+        input_features (:obj:`torch.LongTensor` of shape :obj:`(batch_size, sequence_length, feature_size)`):
+            Float values of fbank features extracted from the raw speech waveform. Raw speech waveform can be obtained
+            by loading a ``.flac`` or ``.wav`` audio file into an array of type :obj:`List[float]` or a
+            :obj:`numpy.ndarray`, *e.g.* via the soundfile library (``pip install soundfile``). To prepare the array
+            into :obj:`input_features`, the :class:`~transformers.Speech2TextTokenizer` should be used for extracting
+            the fbank features, padding and conversion into a tensor of type :obj:`torch.FloatTensor`. See
+            :meth:`~transformers.Speech2TextTokenizer.__call__`
+        attention_mask (:obj:`torch.Tensor` of shape :obj:`(batch_size, sequence_length)`, `optional`):
+            Mask to avoid performing convolution and attention on padding token indices. Mask values selected in ``[0,
+            1]``:
+
+            - 1 for tokens that are **not masked**,
+            - 0 for tokens that are **masked**.
+
+            `What are attention masks? <../glossary.html#attention-mask>`__
+        decoder_input_ids (:obj:`torch.LongTensor` of shape :obj:`(batch_size, target_sequence_length)`, `optional`):
+            Indices of decoder input sequence tokens in the vocabulary.
+
+            Indices can be obtained using :class:`~transformers.SpeechToTextTokenizer`. See
+            :meth:`transformers.PreTrainedTokenizer.encode` and :meth:`transformers.PreTrainedTokenizer.__call__` for
+            details.
+
+            `What are decoder input IDs? <../glossary.html#decoder-input-ids>`__
+
+            SpeechToText uses the :obj:`eos_token_id` as the starting token for :obj:`decoder_input_ids` generation. If
+            :obj:`past_key_values` is used, optionally only the last :obj:`decoder_input_ids` have to be input (see
+            :obj:`past_key_values`).
+        decoder_attention_mask (:obj:`torch.LongTensor` of shape :obj:`(batch_size, target_sequence_length)`, `optional`):
+            Default behavior: generate a tensor that ignores pad tokens in :obj:`decoder_input_ids`. Causal mask will
+            also be used by default. <<<<<<< HEAD
+
+            If you want to change padding behavior, you should read
+            :func:`modeling_speech_to_text._prepare_decoder_inputs` and modify to your needs. See diagram 1 in `the
+            paper <https://arxiv.org/abs/1910.13461>`__ for more information on the default strategy.
+        head_mask (:obj:`torch.Tensor` of shape :obj:`(encoder_layers, encoder_attention_heads)`, `optional`):
+            Mask to nullify selected heads of the attention modules in the encoder. Mask values selected in ``[0, 1]``:
+
+            - 1 indicates the head is **not masked**,
+            - 0 indicates the head is **masked**.
+
+        decoder_head_mask (:obj:`torch.Tensor` of shape :obj:`(decoder_layers, decoder_attention_heads)`, `optional`):
+            Mask to nullify selected heads of the attention modules in the decoder. Mask values selected in ``[0, 1]``:
+
+            - 1 indicates the head is **not masked**,
+            - 0 indicates the head is **masked**.
+
+        cross_attn_head_mask (:obj:`torch.Tensor` of shape :obj:`(decoder_layers, decoder_attention_heads)`, `optional`):
+            Mask to nullify selected heads of the cross-attention modules. Mask values selected in ``[0, 1]``:
+
+            - 1 indicates the head is **not masked**,
+            - 0 indicates the head is **masked**.
+
+        encoder_outputs (:obj:`tuple(tuple(torch.FloatTensor)`, `optional`):
+            Tuple consists of (:obj:`last_hidden_state`, `optional`: :obj:`hidden_states`, `optional`:
+            :obj:`attentions`) :obj:`last_hidden_state` of shape :obj:`(batch_size, sequence_length, hidden_size)`,
+            `optional`) is a sequence of hidden-states at the output of the last layer of the encoder. Used in the
+            cross-attention of the decoder.
+        past_key_values (:obj:`tuple(tuple(torch.FloatTensor))`, `optional`, returned when ``use_cache=True`` is passed or when ``config.use_cache=True``):
+            Tuple of :obj:`tuple(torch.FloatTensor)` of length :obj:`config.n_layers`, with each tuple having 2 tensors
+            of shape :obj:`(batch_size, num_heads, sequence_length, embed_size_per_head)`) and 2 additional tensors of
+            shape :obj:`(batch_size, num_heads, encoder_sequence_length, embed_size_per_head)`.
+
+            Contains pre-computed hidden-states (key and values in the self-attention blocks and in the cross-attention
+            blocks) that can be used (see :obj:`past_key_values` input) to speed up sequential decoding.
+
+            If :obj:`past_key_values` are used, the user can optionally input only the last :obj:`decoder_input_ids`
+            (those that don't have their past key value states given to this model) of shape :obj:`(batch_size, 1)`
+            instead of all :obj:`decoder_input_ids`` of shape :obj:`(batch_size, sequence_length)`.
+        decoder_inputs_embeds (:obj:`torch.FloatTensor` of shape :obj:`(batch_size, target_sequence_length, hidden_size)`, `optional`):
+            Optionally, instead of passing :obj:`decoder_input_ids` you can choose to directly pass an embedded
+            representation. If :obj:`past_key_values` is used, optionally only the last :obj:`decoder_inputs_embeds`
+            have to be input (see :obj:`past_key_values`). This is useful if you want more control over how to convert
+            :obj:`decoder_input_ids` indices into associated vectors than the model's internal embedding lookup matrix.
+
+            If :obj:`decoder_input_ids` and :obj:`decoder_inputs_embeds` are both unset, :obj:`decoder_inputs_embeds`
+            takes the value of :obj:`inputs_embeds`.
+        use_cache (:obj:`bool`, `optional`):
+            If set to :obj:`True`, :obj:`past_key_values` key value states are returned and can be used to speed up
+            decoding (see :obj:`past_key_values`).
+        output_attentions (:obj:`bool`, `optional`):
+            Whether or not to return the attentions tensors of all attention layers. See ``attentions`` under returned
+            tensors for more detail.
+        output_hidden_states (:obj:`bool`, `optional`):
+            Whether or not to return the hidden states of all layers. See ``hidden_states`` under returned tensors for
+            more detail.
+        return_dict (:obj:`bool`, `optional`):
+            Whether or not to return a :class:`~transformers.file_utils.ModelOutput` instead of a plain tuple.
+"""
