@@ -191,7 +191,6 @@ class FillMaskPipeline(Pipeline):
 
                 logits = outputs[i, masked_index.item(), :]
                 probs = logits.softmax(dim=0)
-
                 if targets is not None:
                     probs = probs[..., target_ids]
 
@@ -199,6 +198,8 @@ class FillMaskPipeline(Pipeline):
 
             for v, p in zip(values.tolist(), predictions.tolist()):
                 tokens = input_ids.numpy()
+                if targets is not None:
+                    p = target_ids[p].tolist()
                 tokens[masked_index] = p
                 # Filter padding out:
                 tokens = tokens[np.where(tokens != self.tokenizer.pad_token_id)]

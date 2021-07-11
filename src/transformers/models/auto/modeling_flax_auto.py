@@ -54,6 +54,14 @@ from ..electra.modeling_flax_electra import (
     FlaxElectraModel,
 )
 from ..gpt2.modeling_flax_gpt2 import FlaxGPT2LMHeadModel, FlaxGPT2Model
+from ..gpt_neo.modeling_flax_gpt_neo import FlaxGPTNeoForCausalLM, FlaxGPTNeoModel
+from ..marian.modeling_flax_marian import FlaxMarianModel, FlaxMarianMTModel
+from ..mbart.modeling_flax_mbart import (
+    FlaxMBartForConditionalGeneration,
+    FlaxMBartForQuestionAnswering,
+    FlaxMBartForSequenceClassification,
+    FlaxMBartModel,
+)
 from ..roberta.modeling_flax_roberta import (
     FlaxRobertaForMaskedLM,
     FlaxRobertaForMultipleChoice,
@@ -62,7 +70,9 @@ from ..roberta.modeling_flax_roberta import (
     FlaxRobertaForTokenClassification,
     FlaxRobertaModel,
 )
+from ..t5.modeling_flax_t5 import FlaxT5ForConditionalGeneration, FlaxT5Model
 from ..vit.modeling_flax_vit import FlaxViTForImageClassification, FlaxViTModel
+from ..wav2vec2.modeling_flax_wav2vec2 import FlaxWav2Vec2ForPreTraining, FlaxWav2Vec2Model
 from .auto_factory import auto_class_factory
 from .configuration_auto import (
     BartConfig,
@@ -71,8 +81,14 @@ from .configuration_auto import (
     CLIPConfig,
     ElectraConfig,
     GPT2Config,
+    GPTNeoConfig,
+    MarianConfig,
+    MBartConfig,
+    MT5Config,
     RobertaConfig,
+    T5Config,
     ViTConfig,
+    Wav2Vec2Config,
 )
 
 
@@ -87,9 +103,15 @@ FLAX_MODEL_MAPPING = OrderedDict(
         (BigBirdConfig, FlaxBigBirdModel),
         (BartConfig, FlaxBartModel),
         (GPT2Config, FlaxGPT2Model),
+        (GPTNeoConfig, FlaxGPTNeoModel),
         (ElectraConfig, FlaxElectraModel),
         (CLIPConfig, FlaxCLIPModel),
         (ViTConfig, FlaxViTModel),
+        (MBartConfig, FlaxMBartModel),
+        (T5Config, FlaxT5Model),
+        (MT5Config, FlaxT5Model),
+        (Wav2Vec2Config, FlaxWav2Vec2Model),
+        (MarianConfig, FlaxMarianModel),
     ]
 )
 
@@ -101,6 +123,10 @@ FLAX_MODEL_FOR_PRETRAINING_MAPPING = OrderedDict(
         (BigBirdConfig, FlaxBigBirdForPreTraining),
         (BartConfig, FlaxBartForConditionalGeneration),
         (ElectraConfig, FlaxElectraForPreTraining),
+        (MBartConfig, FlaxMBartForConditionalGeneration),
+        (T5Config, FlaxT5ForConditionalGeneration),
+        (MT5Config, FlaxT5ForConditionalGeneration),
+        (Wav2Vec2Config, FlaxWav2Vec2ForPreTraining),
     ]
 )
 
@@ -112,6 +138,17 @@ FLAX_MODEL_FOR_MASKED_LM_MAPPING = OrderedDict(
         (BigBirdConfig, FlaxBigBirdForMaskedLM),
         (BartConfig, FlaxBartForConditionalGeneration),
         (ElectraConfig, FlaxElectraForMaskedLM),
+        (MBartConfig, FlaxMBartForConditionalGeneration),
+    ]
+)
+
+FLAX_MODEL_FOR_SEQ_TO_SEQ_CAUSAL_LM_MAPPING = OrderedDict(
+    [
+        # Model for Seq2Seq Causal LM mapping
+        (BartConfig, FlaxBartForConditionalGeneration),
+        (T5Config, FlaxT5ForConditionalGeneration),
+        (MT5Config, FlaxT5ForConditionalGeneration),
+        (MarianConfig, FlaxMarianMTModel),
     ]
 )
 
@@ -125,14 +162,8 @@ FLAX_MODEL_FOR_IMAGE_CLASSIFICATION_MAPPING = OrderedDict(
 FLAX_MODEL_FOR_CAUSAL_LM_MAPPING = OrderedDict(
     [
         # Model for Causal LM mapping
-        (GPT2Config, FlaxGPT2LMHeadModel)
-    ]
-)
-
-FLAX_MODEL_FOR_SEQ_TO_SEQ_CAUSAL_LM_MAPPING = OrderedDict(
-    [
-        # Model for Seq2Seq Causal LM mapping
-        (BartConfig, FlaxBartForConditionalGeneration)
+        (GPT2Config, FlaxGPT2LMHeadModel),
+        (GPTNeoConfig, FlaxGPTNeoForCausalLM),
     ]
 )
 
@@ -144,6 +175,7 @@ FLAX_MODEL_FOR_SEQUENCE_CLASSIFICATION_MAPPING = OrderedDict(
         (BigBirdConfig, FlaxBigBirdForSequenceClassification),
         (BartConfig, FlaxBartForSequenceClassification),
         (ElectraConfig, FlaxElectraForSequenceClassification),
+        (MBartConfig, FlaxMBartForSequenceClassification),
     ]
 )
 
@@ -155,6 +187,7 @@ FLAX_MODEL_FOR_QUESTION_ANSWERING_MAPPING = OrderedDict(
         (BigBirdConfig, FlaxBigBirdForQuestionAnswering),
         (BartConfig, FlaxBartForQuestionAnswering),
         (ElectraConfig, FlaxElectraForQuestionAnswering),
+        (MBartConfig, FlaxMBartForQuestionAnswering),
     ]
 )
 
@@ -233,4 +266,10 @@ FlaxAutoModelForNextSentencePrediction = auto_class_factory(
     "FlaxAutoModelForNextSentencePrediction",
     FLAX_MODEL_FOR_NEXT_SENTENCE_PREDICTION_MAPPING,
     head_doc="next sentence prediction",
+)
+
+FlaxAutoModelForSeq2SeqLM = auto_class_factory(
+    "FlaxAutoModelForSeq2SeqLM",
+    FLAX_MODEL_FOR_SEQ_TO_SEQ_CAUSAL_LM_MAPPING,
+    head_doc="sequence-to-sequence language modeling",
 )

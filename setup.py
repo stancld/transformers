@@ -100,7 +100,7 @@ _deps = [
     "flake8>=3.8.3",
     "flax>=0.3.4",
     "fugashi>=1.0",
-    "huggingface-hub==0.0.8",
+    "huggingface-hub==0.0.12",
     "importlib_metadata",
     "ipadic>=1.0.0,<2.0",
     "isort>=5.5.4",
@@ -114,6 +114,7 @@ _deps = [
     "onnxruntime-tools>=1.4.2",
     "onnxruntime>=1.4.0",
     "optuna",
+    "optax>=0.0.8",
     "packaging",
     "parameterized",
     "protobuf",
@@ -124,7 +125,7 @@ _deps = [
     "pytest-sugar",
     "pytest-xdist",
     "python>=3.6.0",
-    "ray",
+    "ray[tune]",
     "recommonmark",
     "regex!=2019.12.17",
     "requests",
@@ -234,7 +235,7 @@ if os.name == "nt":  # windows
     extras["flax"] = []  # jax is not supported on windows
 else:
     extras["retrieval"] = deps_list("faiss-cpu", "datasets")
-    extras["flax"] = deps_list("jax", "jaxlib", "flax")
+    extras["flax"] = deps_list("jax", "jaxlib", "flax", "optax")
 
 extras["tokenizers"] = deps_list("tokenizers")
 extras["onnxruntime"] = deps_list("onnxruntime", "onnxruntime-tools")
@@ -245,7 +246,7 @@ extras["sagemaker"] = deps_list("sagemaker")
 extras["deepspeed"] = deps_list("deepspeed")
 extras["fairscale"] = deps_list("fairscale")
 extras["optuna"] = deps_list("optuna")
-extras["ray"] = deps_list("ray")
+extras["ray"] = deps_list("ray[tune]")
 
 extras["integrations"] = extras["optuna"] + extras["ray"]
 
@@ -325,7 +326,7 @@ install_requires = [
     deps["huggingface-hub"],
     deps["numpy"],
     deps["packaging"],  # utilities from PyPA to e.g., compare versions
-    deps["pyyaml"], # used for the model cards metadata
+    deps["pyyaml"],  # used for the model cards metadata
     deps["regex"],  # for OpenAI GPT
     deps["requests"],  # for downloading models over HTTPS
     deps["sacremoses"],  # for XLM
@@ -335,7 +336,7 @@ install_requires = [
 
 setup(
     name="transformers",
-    version="4.8.0.dev0",  # expected format is one of x.y.z.dev0, or x.y.z.rc1 or x.y.z (no to dashes, yes to dots)
+    version="4.9.0.dev0",  # expected format is one of x.y.z.dev0, or x.y.z.rc1 or x.y.z (no to dashes, yes to dots)
     author="Thomas Wolf, Lysandre Debut, Victor Sanh, Julien Chaumond, Sam Shleifer, Patrick von Platen, Sylvain Gugger, Suraj Patil, Stas Bekman, Google AI Language Team Authors, Open AI team Authors, Facebook AI Authors, Carnegie Mellon University Authors",
     author_email="thomas@huggingface.co",
     description="State-of-the-art Natural Language Processing for TensorFlow 2.0 and PyTorch",
