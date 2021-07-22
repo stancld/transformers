@@ -1468,6 +1468,9 @@ if is_tf_available():
             "TFRoFormerPreTrainedModel",
         ]
     )
+    _import_structure["models.speech_to_text"].extend(
+        ["TFSpeech2TextModel", "TFSpeech2TextPreTrainedModel"]
+    )
     _import_structure["models.t5"].extend(
         [
             "TF_T5_PRETRAINED_MODEL_ARCHIVE_LIST",
@@ -2898,6 +2901,10 @@ if TYPE_CHECKING:
             TFRoFormerLayer,
             TFRoFormerModel,
             TFRoFormerPreTrainedModel,
+        )
+        from .models.speech_to_text import (
+            TFSpeech2TextModel,
+            TFSpeech2TextPreTrainedModel,
         )
         from .models.t5 import (
             TF_T5_PRETRAINED_MODEL_ARCHIVE_LIST,
