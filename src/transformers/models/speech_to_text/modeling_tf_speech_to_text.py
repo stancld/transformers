@@ -52,9 +52,9 @@ from .configuration_speech_to_text import Speech2TextConfig
 
 logger = logging.get_logger(__name__)
 
-_CHECKPOINT_FOR_DOC = "facebook/bart-large"
-_CONFIG_FOR_DOC = "BartConfig"
-_TOKENIZER_FOR_DOC = "BartTokenizer"
+_CONFIG_FOR_DOC = "Speech2TextConfig"
+_TOKENIZER_FOR_DOC = "Speech2TextTokenizer"
+_CHECKPOINT_FOR_DOC = "facebook/s2t-small-librispeech-asr"
 
 
 LARGE_NEGATIVE = -1e8
@@ -123,8 +123,8 @@ class TFConv1dSubsampler(tf.keras.layers.Layer):
     via gated linear units (https://arxiv.org/abs/1911.08460)
     """
 
-    def __init__(self, config):
-        super(TFConv1dSubsampler, self).__init__()
+    def __init__(self, config, **kwargs):
+        super(TFConv1dSubsampler, self).__init__(**kwargs)
         self.config = config
         self.num_layers = config.num_conv_layers
         self.in_channels = config.input_feat_per_channel * config.input_channels
@@ -142,7 +142,7 @@ class TFConv1dSubsampler(tf.keras.layers.Layer):
             for i, k in enumerate(self.kernel_sizes)
         ]
 
-    def forward(self, input_features):
+    def call(self, input_features):
         for conv in self.conv_layers:
             input_features = conv(input_features)
             input_features = glu_activation(input_features, dim=-1)
@@ -159,8 +159,8 @@ class TFWordEmbeddings(tf.keras.layers.Layer):
 class TFSpeech2TextSinusoidalPositionalEmbedding(tf.keras.layers.Layer):
     """This module produces sinusoidal positional embeddings of any length."""
 
-    def __init__(self, num_positions: int, embedding_dim: int, padding_idx: Optional[int] = None):
-        super().__init__()
+    def __init__(self, num_positions: int, embedding_dim: int, padding_idx: Optional[int] = None, **kwargs):
+        super().__init__(**kwargs)
         self.offset = 2
         self.embedding_dim = embedding_dim
         self.padding_idx = padding_idx
@@ -195,7 +195,7 @@ class TFSpeech2TextSinusoidalPositionalEmbedding(tf.keras.layers.Layer):
             emb = tf.einsum("ab, b -> ab", emb, padding_vector)
         return emb
 
-    def forward(self, input_ids: tf.Tensor, past_key_values_length: int = 0):
+    def call(self, input_ids: tf.Tensor, past_key_values_length: int = 0):
         bsz, seq_len = input_ids.shape
         # Create the position ids from the input token ids. Any padded tokens remain padded.
         position_ids = self.create_position_ids_from_input_ids(input_ids, self.padding_idx, past_key_values_length)
@@ -375,8 +375,8 @@ class TFSpeech2TextAttention(tf.keras.layers.Layer):
 
 
 class TFSpeech2TextEncoderLayer(tf.keras.layers.Layer):
-    def __init__(self, config: Speech2TextConfig):
-        super().__init__()
+    def __init__(self, config: Speech2TextConfig, **kwargs):
+        super().__init__(**kwargs)
         self.embed_dim = config.d_model
         self.self_attn = TFSpeech2TextAttention(
             embed_dim=self.embed_dim,
@@ -392,7 +392,7 @@ class TFSpeech2TextEncoderLayer(tf.keras.layers.Layer):
         self.fc2 = tf.keras.layers.Dense(self.embed_dim, name="fc2")
         self.final_layer_norm = tf.keras.layers.LayerNormalization(epsilon=1e-5, name="final_layer_norm")
 
-    def forward(
+    def call(
         self,
         hidden_states: tf.Tensor,
         attention_mask: tf.Tensor,
@@ -448,8 +448,8 @@ class TFSpeech2TextEncoderLayer(tf.keras.layers.Layer):
 
 
 class TFSpeech2TextDecoderLayer(tf.keras.layers.Layer):
-    def __init__(self, config: Speech2TextConfig):
-        super().__init__()
+    def __init__(self, config: Speech2TextConfig, **kwargs):
+        super().__init__(**kwargs)
         self.embed_dim = config.d_model
 
         self.self_attn = TFSpeech2TextAttention(
@@ -474,7 +474,7 @@ class TFSpeech2TextDecoderLayer(tf.keras.layers.Layer):
         self.fc2 = tf.keras.layers.Dense(self.embed_dim, name="fc2")
         self.final_layer_norm = tf.keras.layers.LayerNormalization(epsilon=1e-5, name="final_layer_norm")
 
-    def forward(
+    def call(
         self,
         hidden_states: tf.Tensor,
         attention_mask: Optional[tf.Tensor] = None,
@@ -734,8 +734,8 @@ class TFSpeech2TextEncoder(TFSpeech2TextPreTrainedModel):
         embed_tokens (nn.Embedding): output embedding
     """
 
-    def __init__(self, config: Speech2TextConfig):
-        super().__init__(config)
+    def __init__(self, config: Speech2TextConfig, **kwargs):
+        super().__init__(**kwargs)
 
         self.dropout = tf.keras.layers.Dropout(config.dropout)
         self.layerdrop = config.encoder_layerdrop
@@ -756,7 +756,7 @@ class TFSpeech2TextEncoder(TFSpeech2TextPreTrainedModel):
         self.layers = [TFSpeech2TextEncoderLayer(config, name=f"layers.{i}") for i in range(config.encoder_layers)]
         self.layer_norm = tf.keras.layers.LayerNormalization(epsilon=1e-5, name="layernorm")
 
-    def forward(
+    def call(
         self,
         input_features: tf.Tensor,
         attention_mask: Optional[tf.Tensor] = None,
@@ -875,8 +875,8 @@ class TFSpeech2TextDecoder(TFSpeech2TextPreTrainedModel):
         embed_tokens (nn.Embedding): output embedding
     """
 
-    def __init__(self, config: Speech2TextConfig):
-        super().__init__(config)
+    def __init__(self, config: Speech2TextConfig, **kwargs):
+        super().__init__(**kwargs)
         self.dropout = tf.keras.layers.Dropout(config.dropout)
         self.layerdrop = config.decoder_layerdrop
         self.padding_idx = config.pad_token_id
@@ -920,7 +920,7 @@ class TFSpeech2TextDecoder(TFSpeech2TextPreTrainedModel):
 
         return combined_attention_mask
 
-    def forward(
+    def call(
         self,
         input_ids: Optional[tf.Tensor] = None,
         attention_mask: Optional[tf.Tensor] = None,
