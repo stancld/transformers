@@ -42,7 +42,7 @@ from ...modeling_tf_utils import (
     TFPreTrainedModel,
     TFSharedEmbeddings,
     TFWrappedEmbeddings,
-    input_processing,
+    input_values_processing,
     keras_serializable,
     shape_list,
 )
@@ -117,6 +117,36 @@ def glu_activation(input_tensor: tf.Tensor, dim: int) -> tf.Tensor:
     return a * tf.math.sigmoid(a, b)
 
 
+def _get_subsampled_output_lengths(config: Speech2TextConfig, input_lengths: tf.Tensor):
+    """
+    Computes the output length of the convolutional layers
+    """
+    for _ in range(config.num_conv_layers):
+        input_lengths = (input_lengths - 1) // 2 + 1
+
+    return input_lengths
+
+
+def _get_subsampled_encoder_attn_mask(config: Speech2TextConfig, attention_mask: tf.Tensor):
+    # generate creates 3D attention mask, because of the shape of input_features
+    # convert it to 2D if thats the case
+
+    if len(attention_mask.shape) > 2:
+        attention_mask = attention_mask[:, :, -1]
+
+    subsampled_lengths = _get_subsampled_output_lengths(config, tf.math.reduce_sum(attention_mask, axis=-1))
+    max_len = tf.math.reduce_max(subsampled_lengths)
+    bsz = attention_mask.shape[0]
+    attention_mask = tf.zeros((bsz, max_len), dtype=attention_mask.dtype)
+
+    # these two operations makes sure that all values
+    # before the output lengths indices are attended to
+    # TODO: Fix this - attention_mask[(torch.arange(bsz, device=attention_mask.device), subsampled_lengths - 1)] = 1
+    attention_mask = tf.reverse(tf.cumsum(tf.reverse(attention_mask, axis=[-1]), axis=-1), axis=[-1])
+    attention_mask = tf.cast(attention_mask, dtype=tf.int64)
+    return attention_mask
+
+
 class TFConv1dSubsampler(tf.keras.layers.Layer):
     """
     Convolutional subsampler: a stack of 1D convolution (along temporal dimension) followed by non-linear activation
@@ -178,7 +208,7 @@ class TFSpeech2TextSinusoidalPositionalEmbedding(tf.keras.layers.Layer):
         super().build(input_shape)
 
     @staticmethod
-    def _init_weights(num_embeddings: int, embedding_dim: int, padding_idx: Optional[int] = None):
+    def _init_weight(num_embeddings: int, embedding_dim: int, padding_idx: Optional[int] = None):
         """
         Build sinusoidal embeddings. This matches the implementation in tensor2tensor, but differs slightly from the
         description in Section 3.5 of "Attention Is All You Need".
@@ -203,12 +233,12 @@ class TFSpeech2TextSinusoidalPositionalEmbedding(tf.keras.layers.Layer):
         # Create the position ids from the input token ids. Any padded tokens remain padded.
         position_ids = self.create_position_ids_from_input_ids(input_ids, self.padding_idx, past_key_values_length)
 
-        # expand embeddings if needed
+        # TODO: expand embeddings if needed
         max_pos = self.padding_idx + 1 + seq_len
-        if max_pos > self.weights.shape[0]:
-            self.build(max_pos + self.offset, self.embedding_dim, self.padding_idx)
+        # if max_pos > self.weights.shape[0]:
+        #    self.build(max_pos + self.offset, self.embedding_dim, self.padding_idx)
 
-        return tf.reshape(tf.gather(self.weights, tf.reshape(position_ids.reshape(-1))), (bsz, seq_len, -1))
+        return tf.reshape(tf.gather(self.weights, tf.reshape(position_ids, (-1))), (bsz, seq_len, -1))
 
     def create_position_ids_from_input_ids(
         self, input_ids: tf.Tensor, padding_idx: int, past_key_values_length: Optional[int] = 0
@@ -592,36 +622,6 @@ class TFSpeech2TextPreTrainedModel(TFPreTrainedModel):
                 module.weight.data[module.padding_idx].zero_()
         """
 
-    def _get_subsampled_output_lengths(self, input_lengths: tf.Tensor):
-        """
-        Computes the output length of the convolutional layers
-        """
-        """
-        for i in range(self.config.num_conv_layers):
-            input_lengths = (input_lengths - 1) // 2 + 1
-
-        return input_lengths
-        """
-
-    def _get_subsampled_encoder_attn_mask(self, attention_mask: tf.Tensor):
-        # generate creates 3D attention mask, because of the shape of input_features
-        # convert it to 2D if thats the case
-        """
-        if len(attention_mask.shape) > 2:
-            attention_mask = attention_mask[:, :, -1]
-
-        subsampled_lengths = self._get_subsampled_output_lengths(attention_mask.sum(-1))
-        max_len = tf.math.reduce_max(subsampled_lengths)
-        bsz = attention_mask.shape[0]
-        attention_mask = tf.zeros((bsz, max_len), dtype=attention_mask.dtype)
-
-        # these two operations makes sure that all values
-        # before the output lengths indices are attended to
-        # TODO: Fix this - attention_mask[(torch.arange(bsz, device=attention_mask.device), subsampled_lengths - 1)] = 1
-        attention_mask = tf.reverse(tf.cumsum(tf.reverse(attention_mask, axis=[-1]), axis=-1), axis=[-1])
-        attention_mask = tf.cast(attention_mask, dtype=tf.int64)
-        return attention_mask
-        """
 
 SPEECH_TO_TEXT_START_DOCSTRING = r"""
     This model inherits from :class:`~transformers.PreTrainedModel`. Check the superclass documentation for the generic
@@ -814,7 +814,7 @@ class TFSpeech2TextEncoder(tf.keras.layers.Layer):
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
 
         if attention_mask is not None:
-            attention_mask = self._get_subsampled_encoder_attn_mask(attention_mask)
+            attention_mask = _get_subsampled_encoder_attn_mask(self.config, attention_mask)
 
         inputs_embeds = self.conv(input_features)
         inputs_embeds = self.embed_scale * inputs_embeds
@@ -1041,7 +1041,7 @@ class TFSpeech2TextDecoder(tf.keras.layers.Layer):
 
         # expand encoder attention mask
         if encoder_hidden_states is not None and encoder_attention_mask is not None:
-            encoder_attention_mask = self._get_subsampled_encoder_attn_mask(encoder_attention_mask)
+            encoder_attention_mask = _get_subsampled_encoder_attn_mask(self.config, encoder_attention_mask)
             # [bsz, seq_len] -> [bsz, 1, tgt_seq_len, src_seq_len]
             encoder_attention_mask = _expand_mask(encoder_attention_mask, inputs_embeds.dtype, tgt_len=input_shape[-1])
 
@@ -1169,10 +1169,10 @@ class TFSpeech2TextMainLayer(tf.keras.layers.Layer):
         training=False,
         **kwargs
     ):
-        inputs = input_processing(
+        inputs = input_values_processing(
             func=self.call,
             config=self.config,
-            input_features=input_features,
+            input_values=input_features,
             attention_mask=attention_mask,
             decoder_input_ids=decoder_input_ids,
             decoder_attention_mask=decoder_attention_mask,
@@ -1298,10 +1298,10 @@ class TFSpeech2TextModel(TFSpeech2TextPreTrainedModel):
         training=False,
         **kwargs
     ):
-        inputs = input_processing(
+        inputs = input_values_processing(
             func=self.call,
             config=self.config,
-            input_features=input_features,
+            input_values=input_features,
             attention_mask=attention_mask,
             decoder_input_ids=decoder_input_ids,
             decoder_attention_mask=decoder_attention_mask,

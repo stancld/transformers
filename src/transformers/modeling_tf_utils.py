@@ -451,6 +451,119 @@ def input_processing(func, config, input_ids, **kwargs):
     return output
 
 
+def input_values_processing(func, config, input_values, **kwargs):
+    """
+    Process the input of each TensorFlow model including the booleans. In case of a list of symbolic inputs, each input
+    has to be named accordingly to the parameters name, i.e. :obj:`input_values = tf.keras.Input(shape=(128,),
+    dtype='float32', name="input_values")` otherwise the order of the tensors will not be guaranteed during the
+    training.
+
+    Args:
+        func (:obj:`callable`):
+            The callable function of the TensorFlow model.
+        config (:class:`~transformers.PretrainedConfig`):
+            The config of the running model.
+        **kwargs:
+            The inputs of the model.
+
+    Returns:
+        Two lists, one for the missing layers, and another one for the unexpected layers.
+    """
+    signature = dict(inspect.signature(func).parameters)
+    signature.pop("kwargs", None)
+    signature.pop("self", None)
+    parameter_names = list(signature.keys())
+    output = {}
+    allowed_types = (tf.Tensor, bool, int, ModelOutput, tuple, list, dict, np.ndarray)
+
+    for k, v in kwargs.items():
+        if isinstance(v, allowed_types) or v is None:
+            output[k] = v
+        else:
+            raise ValueError(f"Data of type {type(v)} is not allowed only {allowed_types} is accepted for {k}.")
+
+    if isinstance(input_values, (tuple, list)):
+        for i, input in enumerate(input_values):
+            # EagerTensors don't allow to use the .name property so we check for a real Tensor
+            if type(input) == tf.Tensor:
+                # Tensor names have always the pattern `name:id` then we check only the
+                # `name` part
+                tensor_name = input.name.split(":")[0]
+
+                if tensor_name in parameter_names:
+                    output[tensor_name] = input
+                else:
+                    output[parameter_names[i]] = input
+            elif isinstance(input, allowed_types) or input is None:
+                output[parameter_names[i]] = input
+            else:
+                raise ValueError(
+                    f"Data of type {type(input)} is not allowed only {allowed_types} is accepted for {parameter_names[i]}."
+                )
+    elif isinstance(input_values, (dict, BatchEncoding)):
+        if "inputs" in input_values:
+            warnings.warn(
+                "The `inputs` argument is deprecated and will be removed in a future version, use `input_values` instead.",
+                FutureWarning,
+            )
+
+            output["input_values"] = input_values.pop("inputs")
+
+        if "decoder_cached_states" in input_values:
+            warnings.warn(
+                "The `decoder_cached_states` argument is deprecated and will be removed in a future version, use `past_key_values` instead.",
+                FutureWarning,
+            )
+            output["past_key_values"] = input_values.pop("decoder_cached_states")
+
+        for k, v in dict(input_values).items():
+            if isinstance(v, allowed_types) or v is None:
+                output[k] = v
+            elif k not in parameter_names and "args" not in parameter_names:
+                logger.warning(
+                    f"The parameter {k} does not belongs to the parameter list {parameter_names} and will be ignored."
+                )
+                continue
+            else:
+                raise ValueError(f"Data of type {type(v)} is not allowed only {allowed_types} is accepted for {k}.")
+    else:
+        if isinstance(input_values, tf.Tensor) or input_values is None:
+            output[parameter_names[0]] = input_values
+        else:
+            raise ValueError(
+                f"Data of type {type(input_values)} is not allowed only {allowed_types} is accepted for {parameter_names[0]}."
+            )
+
+    for name in parameter_names:
+        if name not in list(output.keys()) and name != "args":
+            output[name] = kwargs.pop(name, signature[name].default)
+
+    # When creating a SavedModel TF calls the method with LayerCall.__call__(args, **kwargs)
+    # So to respect the proper output we have to add this exception
+    if "args" in output:
+        if output["args"] is not None and type(output["args"]) == tf.Tensor:
+            tensor_name = output["args"].name.split(":")[0]
+            output[tensor_name] = output["args"]
+        else:
+            # `args` in this case is always the first parameter, then `input_values`
+            output["input_values"] = output["args"]
+
+        del output["args"]
+
+    if "kwargs" in output:
+        del output["kwargs"]
+
+    boolean_dict = {
+        k: v
+        for k, v in output.items()
+        if k in ["return_dict", "output_attentions", "output_hidden_states", "use_cache"]
+    }
+
+    output.update(booleans_processing(config=config, **boolean_dict))
+
+    return output
+
+
 def load_tf_weights(model, resolved_archive_file, ignore_mismatched_sizes=False, _prefix=None):
     """
     Detect missing and unexpected layers and load the TF weights accordingly to their names and shapes.
