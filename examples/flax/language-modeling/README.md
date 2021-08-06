@@ -114,7 +114,7 @@ from transformers import RobertaConfig
 
 model_dir = "./norwegian-roberta-base"  # ${MODEL_DIR}
 
-config = RobertaConfig.from_pretrained("roberta-base", vocab_size=tokenizer.vocab_size)
+config = RobertaConfig.from_pretrained("roberta-base", vocab_size=tokenizer.get_vocab_size())
 config.save_pretrained(model_dir)
 ```
 
@@ -349,7 +349,7 @@ from transformers import T5Config
 
 model_dir = "./norwegian-t5-base"  # ${MODEL_DIR}
 
-config = T5Config.from_pretrained("google/t5-v1_1-base", vocab_size=tokenizer.vocab_size)
+config = T5Config.from_pretrained("google/t5-v1_1-base", vocab_size=tokenizer.get_vocab_size())
 config.save_pretrained(model_dir)
 ```
 
@@ -373,15 +373,15 @@ Next we can run the example script to pretrain the model:
 	--weight_decay="0.001" \
 	--warmup_steps="2000" \
 	--overwrite_output_dir \
-	--logging_steps="100" \
-	--save_steps="1000" \
-	--eval_steps="1000" \
+	--logging_steps="500" \
+	--save_steps="10000" \
+	--eval_steps="2500" \
 	--push_to_hub
 ```
 
 Training should converge at a loss and accuracy 
-of 2.2 and 58.0 respectively after 2 epochs on a single TPUv3-8.
-This should take around 24 hours.
+of 2.36 and 57.0 respectively after 3 epochs on a single TPUv3-8.
+This should take around 4.5 hours.
 Training statistics can be accessed on directly on the 🤗 [hub](https://huggingface.co/patrickvonplaten/t5-base-norwegian/tensorboard)
 
 ## Runtime evaluation
