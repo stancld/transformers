@@ -123,8 +123,8 @@ class TFConv1dSubsampler(tf.keras.layers.Layer):
     via gated linear units (https://arxiv.org/abs/1911.08460)
     """
 
-    def __init__(self, config, **kwargs):
-        super(TFConv1dSubsampler, self).__init__(**kwargs)
+    def __init__(self, config: Speech2TextConfig, **kwargs):
+        super().__init__(**kwargs)
         self.config = config
         self.num_layers = config.num_conv_layers
         self.in_channels = config.input_feat_per_channel * config.input_channels
@@ -454,11 +454,11 @@ class TFSpeech2TextDecoderLayer(tf.keras.layers.Layer):
     def __init__(self, config: Speech2TextConfig, **kwargs):
         super().__init__(**kwargs)
         self.embed_dim = config.d_model
-
         self.self_attn = TFSpeech2TextAttention(
             embed_dim=self.embed_dim,
             num_heads=config.decoder_attention_heads,
             dropout=config.attention_dropout,
+            name="self_attn",
             is_decoder=True,
         )
         self.dropout = tf.keras.layers.Dropout(config.dropout)
@@ -470,6 +470,7 @@ class TFSpeech2TextDecoderLayer(tf.keras.layers.Layer):
             self.embed_dim,
             config.decoder_attention_heads,
             dropout=config.attention_dropout,
+            name="encoder_attn",
             is_decoder=True,
         )
         self.encoder_attn_layer_norm = tf.keras.layers.LayerNormalization(epsilon=1e-5, name="encoder_attn_layer_norm")
@@ -731,7 +732,8 @@ SPEECH_TO_TEXT_INPUTS_DOCSTRING = r"""
 
 
 @keras_serializable
-class TFSpeech2TextEncoder(TFSpeech2TextPreTrainedModel):
+class TFSpeech2TextEncoder(tf.keras.layers.Layer):
+    config_class = Speech2TextConfig
     """
     Transformer encoder consisting of *config.encoder_layers* self attention layers. Each layer is a
     :class:`TFSpeech2TextEncoderLayer`.
@@ -741,7 +743,7 @@ class TFSpeech2TextEncoder(TFSpeech2TextPreTrainedModel):
         embed_tokens (nn.Embedding): output embedding
     """
 
-    def __init__(self, config: Speech2TextConfig, embed_tokens: Optional[TFSharedEmbeddings] = None, **kwargs):
+    def __init__(self, config: Speech2TextConfig, **kwargs):
         super().__init__(**kwargs)
         self.config = config
         self.dropout = tf.keras.layers.Dropout(config.dropout)
@@ -754,7 +756,6 @@ class TFSpeech2TextEncoder(TFSpeech2TextPreTrainedModel):
 
         self.conv = TFConv1dSubsampler(config, name="conv_subsampler")
 
-        self.embed_tokens = embed_tokens
         self.embed_positions = TFSpeech2TextSinusoidalPositionalEmbedding(
             self.max_source_positions,
             embed_dim,
@@ -763,12 +764,6 @@ class TFSpeech2TextEncoder(TFSpeech2TextPreTrainedModel):
         )
         self.layers = [TFSpeech2TextEncoderLayer(config, name=f"layers.{i}") for i in range(config.encoder_layers)]
         self.layer_norm = tf.keras.layers.LayerNormalization(epsilon=1e-5, name="layernorm")
-
-    def get_embed_tokens(self):
-        return self.embed_tokens
-
-    def set_embed_tokens(self, embed_tokens):
-        self.embed_tokens = embed_tokens
 
     def call(
         self,
@@ -880,7 +875,8 @@ class TFSpeech2TextEncoder(TFSpeech2TextPreTrainedModel):
 
 
 @keras_serializable
-class TFSpeech2TextDecoder(TFSpeech2TextPreTrainedModel):
+class TFSpeech2TextDecoder(tf.keras.layers.Layer):
+    config_class = Speech2TextConfig
     """
     Transformer decoder consisting of *config.decoder_layers* layers. Each layer is a :class:`TFSpeech2TextDecoderLayer`
 
@@ -1138,6 +1134,7 @@ class TFSpeech2TextMainLayer(tf.keras.layers.Layer):
         with tf.compat.v1.variable_scope(load_weight_prefix) as shared_abs_scope_name:
             pass
 
+        # embed_tokens = TFWrappedEmbeddings(self.shared, abs_scope_name=shared_abs_scope_name)
         self.encoder = TFSpeech2TextEncoder(config, name="encoder")
         self.decoder = TFSpeech2TextDecoder(config, name="decoder")
 
@@ -1152,7 +1149,6 @@ class TFSpeech2TextMainLayer(tf.keras.layers.Layer):
             pass
         # Wraps layer to avoid problems with weight restoring and ensuring we're in the correct TF scope.
         embed_tokens = TFWrappedEmbeddings(self.shared, abs_scope_name=shared_abs_scope_name)
-        self.encoder.set_embed_tokens(embed_tokens)
         self.decoder.set_embed_tokens(embed_tokens)
 
     def call(
