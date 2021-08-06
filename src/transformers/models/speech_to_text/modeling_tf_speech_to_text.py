@@ -136,8 +136,8 @@ class TFConv1dSubsampler(tf.keras.layers.Layer):
             tf.keras.layers.Conv1D(
                 self.mid_channels if i < self.num_layers - 1 else self.out_channels * 2,
                 kernel_size=k,
-                stride=2,
-                padding=k // 2,
+                strides=2,
+                padding="same",
             )
             for i, k in enumerate(self.kernel_sizes)
         ]
@@ -148,13 +148,6 @@ class TFConv1dSubsampler(tf.keras.layers.Layer):
             input_features = glu_activation(input_features, dim=-1)
         return input_features
 
-# TODO: self.embed_tokens = nn.Embedding(config.vocab_size, config.d_model, self.padding_idx)
-
-class TFWordEmbeddings(tf.keras.layers.Layer):
-    def __init__(self, config: Speech2TextConfig, **kwargs):
-        super().__init__(**kwargs)
-        pass
-
 
 class TFSpeech2TextSinusoidalPositionalEmbedding(tf.keras.layers.Layer):
     """This module produces sinusoidal positional embeddings of any length."""
@@ -162,20 +155,30 @@ class TFSpeech2TextSinusoidalPositionalEmbedding(tf.keras.layers.Layer):
     def __init__(self, num_positions: int, embedding_dim: int, padding_idx: Optional[int] = None, **kwargs):
         super().__init__(**kwargs)
         self.offset = 2
+        self.num_positions = num_positions
         self.embedding_dim = embedding_dim
         self.padding_idx = padding_idx
-        self.make_weights(num_positions + self.offset, embedding_dim, padding_idx)
 
-    def make_weights(self, num_embeddings: int, embedding_dim: int, padding_idx: Optional[int] = None):
-        emb_weights = self.get_embedding(num_embeddings, embedding_dim, padding_idx)
-        if hasattr(self, "weights"):
-            # in forward, put the weights on correct device
-            emb_weights = emb_weights.to(self.weights.device)
+    def build(self, input_shape: tf.TensorShape):
+        """
+        Build shared token embedding layer Shared weights logic adapted from
+        https://github.com/tensorflow/models/blob/a009f4fb9d2fc4949e32192a944688925ef78659/official/transformer/v2/embedding_layer.py#L24
+        """
 
-        self.weights = tf.stop_gradient(tf.Variable(emb_weights, trainable=False))
+        weight = self._init_weight(self.num_positions + self.offset, self.embedding_dim)
+
+        self.weight = self.add_weight(
+            name="embeddings",
+            shape=[self.num_positions + self.offset, self.embedding_dim],
+        )
+        weight = tf.cast(weight, dtype=self.weight.dtype)
+
+        self.weight.assign(weight)
+
+        super().build(input_shape)
 
     @staticmethod
-    def get_embedding(num_embeddings: int, embedding_dim: int, padding_idx: Optional[int] = None):
+    def _init_weights(num_embeddings: int, embedding_dim: int, padding_idx: Optional[int] = None):
         """
         Build sinusoidal embeddings. This matches the implementation in tensor2tensor, but differs slightly from the
         description in Section 3.5 of "Attention Is All You Need".
@@ -190,9 +193,9 @@ class TFSpeech2TextSinusoidalPositionalEmbedding(tf.keras.layers.Layer):
         if embedding_dim % 2 == 1:
             # zero pad
             emb = tf.keras.layers.concatenate([emb, tf.zeros(num_embeddings, 1)], axis=1)
-        if padding_idx is not None:
-            padding_vector = tf.constant([0.0 if idx == padding_idx else 1.0 for idx in range(len(emb))])
-            emb = tf.einsum("ab, b -> ab", emb, padding_vector)
+        # if padding_idx is not None:
+            # padding_vector = tf.constant([0.0 if idx == padding_idx else 1.0 for idx in range(len(emb))])
+            # emb = tf.einsum("ab, b -> ab", emb, padding_vector)
         return emb
 
     def call(self, input_ids: tf.Tensor, past_key_values_length: int = 0):
@@ -203,7 +206,7 @@ class TFSpeech2TextSinusoidalPositionalEmbedding(tf.keras.layers.Layer):
         # expand embeddings if needed
         max_pos = self.padding_idx + 1 + seq_len
         if max_pos > self.weights.shape[0]:
-            self.make_weights(max_pos + self.offset, self.embedding_dim, self.padding_idx)
+            self.build(max_pos + self.offset, self.embedding_dim, self.padding_idx)
 
         return tf.reshape(tf.gather(self.weights, tf.reshape(position_ids.reshape(-1))), (bsz, seq_len, -1))
 
@@ -576,6 +579,7 @@ class TFSpeech2TextPreTrainedModel(TFPreTrainedModel):
 
     def _init_weights(self, module):
         # TODO: Convert this method into TensorFlow
+        """
         std = self.config.init_std
         if isinstance(module, (nn.Linear, nn.Conv1d)):
             module.weight.data.normal_(mean=0.0, std=std)
@@ -585,20 +589,23 @@ class TFSpeech2TextPreTrainedModel(TFPreTrainedModel):
             module.weight.data.normal_(mean=0.0, std=std)
             if module.padding_idx is not None:
                 module.weight.data[module.padding_idx].zero_()
+        """
 
     def _get_subsampled_output_lengths(self, input_lengths: tf.Tensor):
         """
         Computes the output length of the convolutional layers
         """
-
+        """
         for i in range(self.config.num_conv_layers):
             input_lengths = (input_lengths - 1) // 2 + 1
 
         return input_lengths
+        """
 
     def _get_subsampled_encoder_attn_mask(self, attention_mask: tf.Tensor):
         # generate creates 3D attention mask, because of the shape of input_features
         # convert it to 2D if thats the case
+        """
         if len(attention_mask.shape) > 2:
             attention_mask = attention_mask[:, :, -1]
 
@@ -613,7 +620,7 @@ class TFSpeech2TextPreTrainedModel(TFPreTrainedModel):
         attention_mask = tf.reverse(tf.cumsum(tf.reverse(attention_mask, axis=[-1]), axis=-1), axis=[-1])
         attention_mask = tf.cast(attention_mask, dtype=tf.int64)
         return attention_mask
-
+        """
 
 SPEECH_TO_TEXT_START_DOCSTRING = r"""
     This model inherits from :class:`~transformers.PreTrainedModel`. Check the superclass documentation for the generic
@@ -734,9 +741,9 @@ class TFSpeech2TextEncoder(TFSpeech2TextPreTrainedModel):
         embed_tokens (nn.Embedding): output embedding
     """
 
-    def __init__(self, config: Speech2TextConfig, **kwargs):
+    def __init__(self, config: Speech2TextConfig, embed_tokens: Optional[TFSharedEmbeddings] = None, **kwargs):
         super().__init__(**kwargs)
-
+        self.config = config
         self.dropout = tf.keras.layers.Dropout(config.dropout)
         self.layerdrop = config.encoder_layerdrop
 
@@ -747,6 +754,7 @@ class TFSpeech2TextEncoder(TFSpeech2TextPreTrainedModel):
 
         self.conv = TFConv1dSubsampler(config, name="conv_subsampler")
 
+        self.embed_tokens = embed_tokens
         self.embed_positions = TFSpeech2TextSinusoidalPositionalEmbedding(
             self.max_source_positions,
             embed_dim,
@@ -755,6 +763,12 @@ class TFSpeech2TextEncoder(TFSpeech2TextPreTrainedModel):
         )
         self.layers = [TFSpeech2TextEncoderLayer(config, name=f"layers.{i}") for i in range(config.encoder_layers)]
         self.layer_norm = tf.keras.layers.LayerNormalization(epsilon=1e-5, name="layernorm")
+
+    def get_embed_tokens(self):
+        return self.embed_tokens
+
+    def set_embed_tokens(self, embed_tokens):
+        self.embed_tokens = embed_tokens
 
     def call(
         self,
@@ -875,15 +889,14 @@ class TFSpeech2TextDecoder(TFSpeech2TextPreTrainedModel):
         embed_tokens (nn.Embedding): output embedding
     """
 
-    def __init__(self, config: Speech2TextConfig, **kwargs):
+    def __init__(self, config: Speech2TextConfig, embed_tokens: Optional[TFSharedEmbeddings] = None, **kwargs):
         super().__init__(**kwargs)
+        self.config = config
         self.dropout = tf.keras.layers.Dropout(config.dropout)
         self.layerdrop = config.decoder_layerdrop
         self.padding_idx = config.pad_token_id
         self.max_target_positions = config.max_target_positions
         self.embed_scale = math.sqrt(config.d_model) if config.scale_embedding else 1.0
-
-        # TODO: self.embed_tokens = nn.Embedding(config.vocab_size, config.d_model, self.padding_idx)
 
         self.embed_positions = TFSpeech2TextSinusoidalPositionalEmbedding(
             self.max_target_positions,
@@ -891,16 +904,14 @@ class TFSpeech2TextDecoder(TFSpeech2TextPreTrainedModel):
             self.padding_idx,
             name="embed_positions"
         )
-        self.layers = [TFSpeech2TextDecoderLayer(config, name=f"layers.{i}") for i in range(config.decoder_layers)]
+        self.d_layers = [TFSpeech2TextDecoderLayer(config, name=f"layers.{i}") for i in range(config.decoder_layers)]
         self.layer_norm = tf.keras.layers.LayerNormalization(epsilon=1e-5, name="layernorm")
 
-        self.init_weights()
-
-    def get_input_embeddings(self):
+    def get_embed_tokens(self):
         return self.embed_tokens
 
-    def set_input_embeddings(self, value):
-        self.embed_tokens = value
+    def set_embed_tokens(self, embed_tokens):
+        self.embed_tokens = embed_tokens
 
     def _prepare_decoder_attention_mask(self, attention_mask, input_shape, inputs_embeds, past_key_values_length):
         # create causal mask
