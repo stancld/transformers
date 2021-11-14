@@ -13,11 +13,17 @@
 # limitations under the License.
 
 from dataclasses import dataclass
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Union
 
 import torch
 
 from .file_utils import ModelOutput
+
+
+PAST_KEY_VALUES_TYPE = Union[
+    Tuple[torch.FloatTensor, torch.FloatTensor],
+    Tuple[torch.FloatTensor, torch.FloatTensor, torch.FloatTensor, torch.FloatTensor],
+]
 
 
 @dataclass
@@ -74,8 +80,8 @@ class BaseModelOutputWithPooling(ModelOutput):
 
     last_hidden_state: torch.FloatTensor = None
     pooler_output: torch.FloatTensor = None
-    hidden_states: Optional[Tuple[torch.FloatTensor]] = None
-    attentions: Optional[Tuple[torch.FloatTensor]] = None
+    hidden_states: Optional[Tuple[torch.FloatTensor, ...]] = None
+    attentions: Optional[Tuple[torch.FloatTensor, ...]] = None
 
 
 @dataclass
@@ -112,9 +118,9 @@ class BaseModelOutputWithPast(ModelOutput):
     """
 
     last_hidden_state: torch.FloatTensor = None
-    past_key_values: Optional[Tuple[Tuple[torch.FloatTensor]]] = None
-    hidden_states: Optional[Tuple[torch.FloatTensor]] = None
-    attentions: Optional[Tuple[torch.FloatTensor]] = None
+    past_key_values: Optional[Tuple[PAST_KEY_VALUES_TYPE, ...]] = None
+    hidden_states: Optional[Tuple[torch.FloatTensor, ...]] = None
+    attentions: Optional[Tuple[torch.FloatTensor, ...]] = None
 
 
 @dataclass
@@ -145,9 +151,9 @@ class BaseModelOutputWithCrossAttentions(ModelOutput):
     """
 
     last_hidden_state: torch.FloatTensor = None
-    hidden_states: Optional[Tuple[torch.FloatTensor]] = None
-    attentions: Optional[Tuple[torch.FloatTensor]] = None
-    cross_attentions: Optional[Tuple[torch.FloatTensor]] = None
+    hidden_states: Optional[Tuple[torch.FloatTensor, ...]] = None
+    attentions: Optional[Tuple[torch.FloatTensor, ...]] = None
+    cross_attentions: Optional[Tuple[torch.FloatTensor, ...]] = None
 
 
 @dataclass
@@ -193,10 +199,10 @@ class BaseModelOutputWithPoolingAndCrossAttentions(ModelOutput):
 
     last_hidden_state: torch.FloatTensor = None
     pooler_output: torch.FloatTensor = None
-    hidden_states: Optional[Tuple[torch.FloatTensor]] = None
-    past_key_values: Optional[Tuple[Tuple[torch.FloatTensor]]] = None
-    attentions: Optional[Tuple[torch.FloatTensor]] = None
-    cross_attentions: Optional[Tuple[torch.FloatTensor]] = None
+    hidden_states: Optional[Tuple[torch.FloatTensor, ...]] = None
+    past_key_values: Optional[Tuple[PAST_KEY_VALUES_TYPE, ...]] = None
+    attentions: Optional[Tuple[torch.FloatTensor, ...]] = None
+    cross_attentions: Optional[Tuple[torch.FloatTensor, ...]] = None
 
 
 @dataclass
@@ -239,10 +245,10 @@ class BaseModelOutputWithPastAndCrossAttentions(ModelOutput):
     """
 
     last_hidden_state: torch.FloatTensor = None
-    past_key_values: Optional[Tuple[Tuple[torch.FloatTensor]]] = None
-    hidden_states: Optional[Tuple[torch.FloatTensor]] = None
-    attentions: Optional[Tuple[torch.FloatTensor]] = None
-    cross_attentions: Optional[Tuple[torch.FloatTensor]] = None
+    past_key_values: Optional[Tuple[PAST_KEY_VALUES_TYPE, ...]] = None
+    hidden_states: Optional[Tuple[torch.FloatTensor, ...]] = None
+    attentions: Optional[Tuple[torch.FloatTensor, ...]] = None
+    cross_attentions: Optional[Tuple[torch.FloatTensor, ...]] = None
 
 
 @dataclass

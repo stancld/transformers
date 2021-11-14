@@ -242,7 +242,9 @@ class ModuleUtilsMixin:
 
         return encoder_extended_attention_mask
 
-    def get_extended_attention_mask(self, attention_mask: Tensor, input_shape: Tuple[int], device: device) -> Tensor:
+    def get_extended_attention_mask(
+        self, attention_mask: Tensor, input_shape: Union[Tuple[int, ...], torch.Size], device: device
+    ) -> Tensor:
         """
         Makes broadcastable attention and causal masks so that future and masked tokens are ignored.
 
@@ -443,13 +445,13 @@ class PreTrainedModel(nn.Module, ModuleUtilsMixin, GenerationMixin, PushToHubMix
     base_model_prefix = ""
     # a list of re pattern of tensor names to ignore from the model when loading the model weights
     # (and avoid unnecessary warnings).
-    _keys_to_ignore_on_load_missing = None
+    _keys_to_ignore_on_load_missing: Optional[List[str]] = None
     # a list of re pattern of tensor names to ignore from the weights when loading the model weights
     # (and avoid unnecessary warnings).
-    _keys_to_ignore_on_load_unexpected = None
+    _keys_to_ignore_on_load_unexpected: Optional[List[str]] = None
     # a list of of tensor names to ignore when saving the model (useful for keys that aren't
     # trained, but which are deterministic, or tied variables)
-    _keys_to_ignore_on_save = None
+    _keys_to_ignore_on_save: Optional[List[str]] = None
 
     is_parallelizable = False
     supports_gradient_checkpointing = False
