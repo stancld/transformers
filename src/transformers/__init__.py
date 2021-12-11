@@ -825,6 +825,7 @@ if is_torch_available():
             "DebertaForSequenceClassification",
             "DebertaForTokenClassification",
             "DebertaModel",
+            "DebertaLMHeadModel",
             "DebertaPreTrainedModel",
         ]
     )
@@ -2751,6 +2752,7 @@ if TYPE_CHECKING:
             DebertaForSequenceClassification,
             DebertaForTokenClassification,
             DebertaModel,
+            DebertaLMHeadModel,
             DebertaPreTrainedModel,
         )
         from .models.deberta_v2 import (
