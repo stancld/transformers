@@ -213,6 +213,7 @@ _import_structure = {
     "models.layoutxlm": ["LayoutXLMProcessor"],
     "models.led": ["LED_PRETRAINED_CONFIG_ARCHIVE_MAP", "LEDConfig", "LEDTokenizer"],
     "models.longformer": ["LONGFORMER_PRETRAINED_CONFIG_ARCHIVE_MAP", "LongformerConfig", "LongformerTokenizer"],
+    "models.longt5": ["LONGT5_PRETRAINED_CONFIG_ARCHIVE_MAP", "LongT5Config"],
     "models.luke": ["LUKE_PRETRAINED_CONFIG_ARCHIVE_MAP", "LukeConfig", "LukeTokenizer"],
     "models.lxmert": ["LXMERT_PRETRAINED_CONFIG_ARCHIVE_MAP", "LxmertConfig", "LxmertTokenizer"],
     "models.m2m_100": ["M2M_100_PRETRAINED_CONFIG_ARCHIVE_MAP", "M2M100Config"],
@@ -266,7 +267,6 @@ _import_structure = {
     "models.squeezebert": ["SQUEEZEBERT_PRETRAINED_CONFIG_ARCHIVE_MAP", "SqueezeBertConfig", "SqueezeBertTokenizer"],
     "models.swin": ["SWIN_PRETRAINED_CONFIG_ARCHIVE_MAP", "SwinConfig"],
     "models.t5": ["T5_PRETRAINED_CONFIG_ARCHIVE_MAP", "T5Config"],
-    "models.longt5": ["LONGT5_PRETRAINED_CONFIG_ARCHIVE_MAP", "LongT5Config"],
     "models.tapas": ["TAPAS_PRETRAINED_CONFIG_ARCHIVE_MAP", "TapasConfig", "TapasTokenizer"],
     "models.tapex": ["TapexTokenizer"],
     "models.transfo_xl": [
@@ -1134,6 +1134,16 @@ if is_torch_available():
             "LongformerSelfAttention",
         ]
     )
+    _import_structure["models.longt5"].extend(
+        [
+            "LONGT5_PRETRAINED_MODEL_ARCHIVE_LIST",
+            "LongT5EncoderModel",
+            "LongT5ForConditionalGeneration",
+            "LongT5Model",
+            "LongT5PreTrainedModel",
+            "load_tf_weights_in_longt5",
+        ]
+    )
     _import_structure["models.luke"].extend(
         [
             "LUKE_PRETRAINED_MODEL_ARCHIVE_LIST",
@@ -1485,16 +1495,6 @@ if is_torch_available():
             "T5Model",
             "T5PreTrainedModel",
             "load_tf_weights_in_t5",
-        ]
-    )
-    _import_structure["models.longt5"].extend(
-        [
-            "LONGT5_PRETRAINED_MODEL_ARCHIVE_LIST",
-            "LongT5EncoderModel",
-            "LongT5ForConditionalGeneration",
-            "LongT5Model",
-            "LongT5PreTrainedModel",
-            "load_tf_weights_in_longt5",
         ]
     )
     _import_structure["models.transfo_xl"].extend(
@@ -2005,6 +2005,15 @@ if is_tf_available():
             "TFLongformerSelfAttention",
         ]
     )
+    _import_structure["models.longt5"].extend(
+        [
+            "TF_LONGT5_PRETRAINED_MODEL_ARCHIVE_LIST",
+            "TFLongT5EncoderModel",
+            "TFLongT5ForConditionalGeneration",
+            "TFLongT5Model",
+            "TFLongT5PreTrainedModel",
+        ]
+    )
     _import_structure["models.lxmert"].extend(
         [
             "TF_LXMERT_PRETRAINED_MODEL_ARCHIVE_LIST",
@@ -2127,15 +2136,6 @@ if is_tf_available():
             "TFT5ForConditionalGeneration",
             "TFT5Model",
             "TFT5PreTrainedModel",
-        ]
-    )
-    _import_structure["models.longt5"].extend(
-        [
-            "TF_LONGT5_PRETRAINED_MODEL_ARCHIVE_LIST",
-            "TFLongT5EncoderModel",
-            "TFLongT5ForConditionalGeneration",
-            "TFLongT5Model",
-            "TFLongT5PreTrainedModel",
         ]
     )
     _import_structure["models.tapas"].extend(
@@ -2381,6 +2381,9 @@ if is_flax_available():
         ["FlaxGPTNeoForCausalLM", "FlaxGPTNeoModel", "FlaxGPTNeoPreTrainedModel"]
     )
     _import_structure["models.gptj"].extend(["FlaxGPTJForCausalLM", "FlaxGPTJModel", "FlaxGPTJPreTrainedModel"])
+    _import_structure["models.longt5"].extend(
+        ["FlaxLongT5ForConditionalGeneration", "FlaxLongT5Model", "FlaxLongT5PreTrainedModel"]
+    )
     _import_structure["models.marian"].extend(
         [
             "FlaxMarianModel",
@@ -2429,9 +2432,6 @@ if is_flax_available():
     )
     _import_structure["models.speech_encoder_decoder"].append("FlaxSpeechEncoderDecoderModel")
     _import_structure["models.t5"].extend(["FlaxT5ForConditionalGeneration", "FlaxT5Model", "FlaxT5PreTrainedModel"])
-    _import_structure["models.longt5"].extend(
-        ["FlaxLongT5ForConditionalGeneration", "FlaxLongT5Model", "FlaxLongT5PreTrainedModel"]
-    )
     _import_structure["models.vision_encoder_decoder"].append("FlaxVisionEncoderDecoderModel")
     _import_structure["models.vision_text_dual_encoder"].extend(["FlaxVisionTextDualEncoderModel"])
     _import_structure["models.vit"].extend(["FlaxViTForImageClassification", "FlaxViTModel", "FlaxViTPreTrainedModel"])
@@ -2622,6 +2622,7 @@ if TYPE_CHECKING:
     from .models.layoutxlm import LayoutXLMProcessor
     from .models.led import LED_PRETRAINED_CONFIG_ARCHIVE_MAP, LEDConfig, LEDTokenizer
     from .models.longformer import LONGFORMER_PRETRAINED_CONFIG_ARCHIVE_MAP, LongformerConfig, LongformerTokenizer
+    from .models.longt5 import LONGT5_PRETRAINED_CONFIG_ARCHIVE_MAP, LongT5Config
     from .models.luke import LUKE_PRETRAINED_CONFIG_ARCHIVE_MAP, LukeConfig, LukeTokenizer
     from .models.lxmert import LXMERT_PRETRAINED_CONFIG_ARCHIVE_MAP, LxmertConfig, LxmertTokenizer
     from .models.m2m_100 import M2M_100_PRETRAINED_CONFIG_ARCHIVE_MAP, M2M100Config
@@ -2666,7 +2667,6 @@ if TYPE_CHECKING:
     from .models.squeezebert import SQUEEZEBERT_PRETRAINED_CONFIG_ARCHIVE_MAP, SqueezeBertConfig, SqueezeBertTokenizer
     from .models.swin import SWIN_PRETRAINED_CONFIG_ARCHIVE_MAP, SwinConfig
     from .models.t5 import T5_PRETRAINED_CONFIG_ARCHIVE_MAP, T5Config
-    from .models.longt5 import LONGT5_PRETRAINED_CONFIG_ARCHIVE_MAP, LongT5Config
     from .models.tapas import TAPAS_PRETRAINED_CONFIG_ARCHIVE_MAP, TapasConfig, TapasTokenizer
     from .models.tapex import TapexTokenizer
     from .models.transfo_xl import (
@@ -3395,6 +3395,14 @@ if TYPE_CHECKING:
             LongformerPreTrainedModel,
             LongformerSelfAttention,
         )
+        from .models.longt5 import (
+            LONGT5_PRETRAINED_MODEL_ARCHIVE_LIST,
+            LongT5EncoderModel,
+            LongT5ForConditionalGeneration,
+            LongT5Model,
+            LongT5PreTrainedModel,
+            load_tf_weights_in_longt5,
+        )
         from .models.luke import (
             LUKE_PRETRAINED_MODEL_ARCHIVE_LIST,
             LukeForEntityClassification,
@@ -3686,14 +3694,6 @@ if TYPE_CHECKING:
             T5Model,
             T5PreTrainedModel,
             load_tf_weights_in_t5,
-        )
-        from .models.longt5 import (
-            LONGT5_PRETRAINED_MODEL_ARCHIVE_LIST,
-            LongT5EncoderModel,
-            LongT5ForConditionalGeneration,
-            LongT5Model,
-            LongT5PreTrainedModel,
-            load_tf_weights_in_longt5,
         )
         from .models.transfo_xl import (
             TRANSFO_XL_PRETRAINED_MODEL_ARCHIVE_LIST,
@@ -4117,6 +4117,13 @@ if TYPE_CHECKING:
             TFLongformerPreTrainedModel,
             TFLongformerSelfAttention,
         )
+        from .models.longt5 import (
+            TF_LONGT5_PRETRAINED_MODEL_ARCHIVE_LIST,
+            TFLongT5EncoderModel,
+            TFLongT5ForConditionalGeneration,
+            TFLongT5Model,
+            TFLongT5PreTrainedModel,
+        )
         from .models.lxmert import (
             TF_LXMERT_PRETRAINED_MODEL_ARCHIVE_LIST,
             TFLxmertForPreTraining,
@@ -4211,13 +4218,6 @@ if TYPE_CHECKING:
             TFT5ForConditionalGeneration,
             TFT5Model,
             TFT5PreTrainedModel,
-        )
-        from .models.longt5 import (
-            TF_LONGT5_PRETRAINED_MODEL_ARCHIVE_LIST,
-            TFLongT5EncoderModel,
-            TFLongT5ForConditionalGeneration,
-            TFLongT5Model,
-            TFLongT5PreTrainedModel,
         )
         from .models.tapas import (
             TF_TAPAS_PRETRAINED_MODEL_ARCHIVE_LIST,
@@ -4415,6 +4415,7 @@ if TYPE_CHECKING:
         from .models.gpt2 import FlaxGPT2LMHeadModel, FlaxGPT2Model, FlaxGPT2PreTrainedModel
         from .models.gpt_neo import FlaxGPTNeoForCausalLM, FlaxGPTNeoModel, FlaxGPTNeoPreTrainedModel
         from .models.gptj import FlaxGPTJForCausalLM, FlaxGPTJModel, FlaxGPTJPreTrainedModel
+        from .models.longt5 import FlaxLongT5ForConditionalGeneration, FlaxLongT5Model, FlaxLongT5PreTrainedModel
         from .models.marian import FlaxMarianModel, FlaxMarianMTModel, FlaxMarianPreTrainedModel
         from .models.mbart import (
             FlaxMBartForConditionalGeneration,
@@ -4445,7 +4446,6 @@ if TYPE_CHECKING:
         )
         from .models.speech_encoder_decoder import FlaxSpeechEncoderDecoderModel
         from .models.t5 import FlaxT5ForConditionalGeneration, FlaxT5Model, FlaxT5PreTrainedModel
-        from .models.longt5 import FlaxLongT5ForConditionalGeneration, FlaxLongT5Model, FlaxLongT5PreTrainedModel
         from .models.vision_encoder_decoder import FlaxVisionEncoderDecoderModel
         from .models.vision_text_dual_encoder import FlaxVisionTextDualEncoderModel
         from .models.vit import FlaxViTForImageClassification, FlaxViTModel, FlaxViTPreTrainedModel
