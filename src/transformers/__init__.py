@@ -214,6 +214,7 @@ _import_structure = {
     "models.led": ["LED_PRETRAINED_CONFIG_ARCHIVE_MAP", "LEDConfig", "LEDTokenizer"],
     "models.longformer": ["LONGFORMER_PRETRAINED_CONFIG_ARCHIVE_MAP", "LongformerConfig", "LongformerTokenizer"],
     "models.longt5": ["LONGT5_PRETRAINED_CONFIG_ARCHIVE_MAP", "LongT5Config"],
+    "models.longt5": ["LONGT5_PRETRAINED_CONFIG_ARCHIVE_MAP", "LongT5Config"],
     "models.luke": ["LUKE_PRETRAINED_CONFIG_ARCHIVE_MAP", "LukeConfig", "LukeTokenizer"],
     "models.lxmert": ["LXMERT_PRETRAINED_CONFIG_ARCHIVE_MAP", "LxmertConfig", "LxmertTokenizer"],
     "models.m2m_100": ["M2M_100_PRETRAINED_CONFIG_ARCHIVE_MAP", "M2M100Config"],
@@ -1143,6 +1144,16 @@ if is_torch_available():
             "LongT5PreTrainedModel",
         ]
     )
+    _import_structure["models.longt5"].extend(
+        [
+            "LONGT5_PRETRAINED_MODEL_ARCHIVE_LIST",
+            "LongT5EncoderModel",
+            "LongT5ForConditionalGeneration",
+            "LongT5Model",
+            "LongT5PreTrainedModel",
+            "load_tf_weights_in_longt5",
+        ]
+    )
     _import_structure["models.luke"].extend(
         [
             "LUKE_PRETRAINED_MODEL_ARCHIVE_LIST",
@@ -2004,6 +2015,15 @@ if is_tf_available():
             "TFLongformerSelfAttention",
         ]
     )
+    _import_structure["models.longt5"].extend(
+        [
+            "TF_LONGT5_PRETRAINED_MODEL_ARCHIVE_LIST",
+            "TFLongT5EncoderModel",
+            "TFLongT5ForConditionalGeneration",
+            "TFLongT5Model",
+            "TFLongT5PreTrainedModel",
+        ]
+    )
     _import_structure["models.lxmert"].extend(
         [
             "TF_LXMERT_PRETRAINED_MODEL_ARCHIVE_LIST",
@@ -2371,6 +2391,9 @@ if is_flax_available():
         ["FlaxGPTNeoForCausalLM", "FlaxGPTNeoModel", "FlaxGPTNeoPreTrainedModel"]
     )
     _import_structure["models.gptj"].extend(["FlaxGPTJForCausalLM", "FlaxGPTJModel", "FlaxGPTJPreTrainedModel"])
+    _import_structure["models.longt5"].extend(
+        ["FlaxLongT5ForConditionalGeneration", "FlaxLongT5Model", "FlaxLongT5PreTrainedModel"]
+    )
     _import_structure["models.marian"].extend(
         [
             "FlaxMarianModel",
@@ -4395,6 +4418,7 @@ if TYPE_CHECKING:
         from .models.gpt2 import FlaxGPT2LMHeadModel, FlaxGPT2Model, FlaxGPT2PreTrainedModel
         from .models.gpt_neo import FlaxGPTNeoForCausalLM, FlaxGPTNeoModel, FlaxGPTNeoPreTrainedModel
         from .models.gptj import FlaxGPTJForCausalLM, FlaxGPTJModel, FlaxGPTJPreTrainedModel
+        from .models.longt5 import FlaxLongT5ForConditionalGeneration, FlaxLongT5Model, FlaxLongT5PreTrainedModel
         from .models.marian import FlaxMarianModel, FlaxMarianMTModel, FlaxMarianPreTrainedModel
         from .models.mbart import (
             FlaxMBartForConditionalGeneration,
