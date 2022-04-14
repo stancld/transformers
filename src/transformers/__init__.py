@@ -1141,7 +1141,6 @@ if is_torch_available():
             "LongT5ForConditionalGeneration",
             "LongT5Model",
             "LongT5PreTrainedModel",
-            "load_tf_weights_in_longt5",
         ]
     )
     _import_structure["models.luke"].extend(
@@ -2005,15 +2004,6 @@ if is_tf_available():
             "TFLongformerSelfAttention",
         ]
     )
-    _import_structure["models.longt5"].extend(
-        [
-            "TF_LONGT5_PRETRAINED_MODEL_ARCHIVE_LIST",
-            "TFLongT5EncoderModel",
-            "TFLongT5ForConditionalGeneration",
-            "TFLongT5Model",
-            "TFLongT5PreTrainedModel",
-        ]
-    )
     _import_structure["models.lxmert"].extend(
         [
             "TF_LXMERT_PRETRAINED_MODEL_ARCHIVE_LIST",
@@ -2381,9 +2371,6 @@ if is_flax_available():
         ["FlaxGPTNeoForCausalLM", "FlaxGPTNeoModel", "FlaxGPTNeoPreTrainedModel"]
     )
     _import_structure["models.gptj"].extend(["FlaxGPTJForCausalLM", "FlaxGPTJModel", "FlaxGPTJPreTrainedModel"])
-    _import_structure["models.longt5"].extend(
-        ["FlaxLongT5ForConditionalGeneration", "FlaxLongT5Model", "FlaxLongT5PreTrainedModel"]
-    )
     _import_structure["models.marian"].extend(
         [
             "FlaxMarianModel",
@@ -3401,7 +3388,6 @@ if TYPE_CHECKING:
             LongT5ForConditionalGeneration,
             LongT5Model,
             LongT5PreTrainedModel,
-            load_tf_weights_in_longt5,
         )
         from .models.luke import (
             LUKE_PRETRAINED_MODEL_ARCHIVE_LIST,
@@ -4117,13 +4103,6 @@ if TYPE_CHECKING:
             TFLongformerPreTrainedModel,
             TFLongformerSelfAttention,
         )
-        from .models.longt5 import (
-            TF_LONGT5_PRETRAINED_MODEL_ARCHIVE_LIST,
-            TFLongT5EncoderModel,
-            TFLongT5ForConditionalGeneration,
-            TFLongT5Model,
-            TFLongT5PreTrainedModel,
-        )
         from .models.lxmert import (
             TF_LXMERT_PRETRAINED_MODEL_ARCHIVE_LIST,
             TFLxmertForPreTraining,
@@ -4415,7 +4394,6 @@ if TYPE_CHECKING:
         from .models.gpt2 import FlaxGPT2LMHeadModel, FlaxGPT2Model, FlaxGPT2PreTrainedModel
         from .models.gpt_neo import FlaxGPTNeoForCausalLM, FlaxGPTNeoModel, FlaxGPTNeoPreTrainedModel
         from .models.gptj import FlaxGPTJForCausalLM, FlaxGPTJModel, FlaxGPTJPreTrainedModel
-        from .models.longt5 import FlaxLongT5ForConditionalGeneration, FlaxLongT5Model, FlaxLongT5PreTrainedModel
         from .models.marian import FlaxMarianModel, FlaxMarianMTModel, FlaxMarianPreTrainedModel
         from .models.mbart import (
             FlaxMBartForConditionalGeneration,
