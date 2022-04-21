@@ -14,6 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import gc
 import json
 import os
 import re
@@ -2068,7 +2069,7 @@ class PreTrainedModel(nn.Module, ModuleUtilsMixin, GenerationMixin, PushToHubMix
             model_to_load = getattr(model, cls.base_model_prefix)
             if any(key in expected_keys_not_prefixed for key in loaded_keys):
                 raise ValueError(
-                    "The state dictionary of the model you are training to load is corrupted. Are you sure it was "
+                    "The state dictionary of the model you are trying to load is corrupted. Are you sure it was "
                     "properly saved?"
                 )
 
@@ -2148,6 +2149,10 @@ class PreTrainedModel(nn.Module, ModuleUtilsMixin, GenerationMixin, PushToHubMix
                     )
                 else:
                     error_msgs += _load_state_dict_into_model(model_to_load, state_dict, start_prefix)
+
+                # force memory release
+                del state_dict
+                gc.collect()
 
         if len(error_msgs) > 0:
             error_msg = "\n\t".join(error_msgs)
