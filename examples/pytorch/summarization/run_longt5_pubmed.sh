@@ -7,6 +7,7 @@ N_GPU=2
 MODEL=$([[ $DEBUG -eq 1 ]] && echo "Stancld/LongT5-Local-Base" || echo "Stancld/LongT5-TGlobal-Large")
 LAUNCH=$([[ $DEBUG -eq 1 ]] && echo "" || echo "-m torch.distributed.launch --nproc_per_node=$N_GPU")  # 2 GPUs given
 BF16=$([[ $DEBUG -eq 1 ]] && echo "False" || echo "True")  # BF16 can be used on A100
+NO_CUDA=$([[ $DEBUG -eq 1 ]] && echo "True" || echo "False")  # BF16 can be used on A100
 
 
 TOTAL_BATHC_SIZE=$([[ $DEBUG -eq 1 ]] && echo 1 || echo 128)
@@ -29,10 +30,15 @@ SCRIPT="python $LAUNCH run_summarization.py \
     --optim adafactor \
     --learning_rate 0.001 \
     --lr_scheduler_type constant \
+    --num_train_epochs 10 \
     --gradient_checkpointing \
     --bf16=$BF16 \
     --per_device_eval_batch_size 8 \
-    --output_dir /tmp/longt5_pubmed
+    --predict_with_generate \
+    --generation_num_beams 1 \
+    --generation_max_length 512 \
+    --output_dir /tmp/longt5_pubmed \
+    --no_cuda=$NO_CUDA
 "
 
 echo "Following script is going to be run: $SCRIPT"
