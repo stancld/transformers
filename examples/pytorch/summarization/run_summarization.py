@@ -281,6 +281,7 @@ summarization_name_mapping = {
     "orange_sum": ("text", "summary"),
     "pn_summary": ("article", "summary"),
     "psc": ("extract_text", "summary_text"),
+    "ccdv/pubmed-summarization": ("article", "abstract"),
     "samsum": ("dialogue", "summary"),
     "thaisum": ("body", "summary"),
     "xglue": ("news_body", "news_title"),
