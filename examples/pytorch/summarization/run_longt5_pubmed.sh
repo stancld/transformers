@@ -1,12 +1,10 @@
 DEBUG=1
-N_GPU=2
 
 DEBUG_CHECK=$([[ $DEBUG -eq 1 ]] && echo "on" || echo "off")
 echo "Debug mode is $DEBUG_CHECK."
 
+N_GPU=2
 MODEL=$([[ $DEBUG -eq 1 ]] && echo "Stancld/LongT5-Local-Base" || echo "Stancld/LongT5-TGlobal-Large")
-
-
 LAUNCH=$([[ $DEBUG -eq 1 ]] && echo "" || echo "-m torch.distributed.launch --nproc_per_node=$N_GPU")  # 2 GPUs given
 BF16=$([[ $DEBUG -eq 1 ]] && echo "False" || echo "True")  # BF16 can be used on A100
 
