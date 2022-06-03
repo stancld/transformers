@@ -512,8 +512,9 @@ def main():
         inputs, targets = [], []
         for i in range(len(examples[text_column])):
             if examples[text_column][i] is not None and examples[summary_column][i] is not None:
-                inputs.append(examples[text_column][i])
-                targets.append(examples[summary_column][i])
+                if len(tokenizer(examples[text_column][i], max_length=20, padding=False, truncation=True).input_ids) > 16:
+                    inputs.append(examples[text_column][i])
+                    targets.append(examples[summary_column][i])
 
         inputs = [prefix + inp for inp in inputs]
         model_inputs = tokenizer(inputs, max_length=data_args.max_source_length, padding=padding, truncation=True)
@@ -536,11 +537,6 @@ def main():
         if "train" not in raw_datasets:
             raise ValueError("--do_train requires a train dataset")
         train_dataset = raw_datasets["train"]
-        selects = [
-            i for i in range(len(train_dataset))
-            if len(tokenizer(train_dataset[i]["article"], max_length=30, padding=False, truncation=True).input_ids) > 16
-        ]
-        train_dataset = train_dataset.select(selects)
         if data_args.max_train_samples is not None:
             max_train_samples = min(len(train_dataset), data_args.max_train_samples)
             train_dataset = train_dataset.select(range(max_train_samples))
