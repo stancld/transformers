@@ -538,7 +538,7 @@ def main():
         train_dataset = raw_datasets["train"]
         selects = [
             i for i in range(len(train_dataset))
-            if len(tokenizer(train_dataset[i]["article"], max_length=30).input_ids) > 16
+            if len(tokenizer(train_dataset[i]["article"], max_length=30, padding=False, truncation=True).input_ids) > 16
         ]
         train_dataset = train_dataset.select(selects)
         if data_args.max_train_samples is not None:
