@@ -72,7 +72,7 @@ except (LookupError, OSError):
 MULTILINGUAL_TOKENIZERS = [MBartTokenizer, MBartTokenizerFast, MBart50Tokenizer, MBart50TokenizerFast]
 
 
-wandb.init(project="LongT5")
+wandb.init(project="LongT5", entity="stancld")
 
 @dataclass
 class ModelArguments:

@@ -13,7 +13,7 @@ FIND_UNUSED_PARAMS=$([[ $DEBUG -eq 1 ]] && echo "False" || echo "True")
 
 
 TOTAL_BATCH_SIZE=$([[ $DEBUG -eq 1 ]] && echo 1 || echo 128)
-PER_DEVICE_BATCH_SIZE=2
+PER_DEVICE_BATCH_SIZE=1
 ACC_STEP=$((TOTAL_BATCH_SIZE / PER_DEVICE_BATCH_SIZE))
 ACC_STEP=$([[ $DEBUG -eq 1 ]] && echo $ACC_STEP || echo $((ACC_STEP / N_GPU)))
 
@@ -43,7 +43,7 @@ SCRIPT="python $LAUNCH run_summarization.py \
     --report_to all \
     --logging_steps 10 \
     --eval_steps 500 \
-    --find_unused_parameters=$FIND_UNUSED_PARAMS \
+    --ddp_find_unused_parameters=$FIND_UNUSED_PARAMS \
     --no_cuda=$NO_CUDA
 "
 
