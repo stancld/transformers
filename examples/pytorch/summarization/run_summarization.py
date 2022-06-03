@@ -512,7 +512,7 @@ def main():
         inputs, targets = [], []
         for i in range(len(examples[text_column])):
             if examples[text_column][i] is not None and examples[summary_column][i] is not None:
-                if len(tokenizer(examples[text_column][i], max_length=20, padding=False, truncation=True).input_ids) > 16:
+                if len(examples[text_column][i].split()) > 15:
                     inputs.append(examples[text_column][i])
                     targets.append(examples[summary_column][i])
 
