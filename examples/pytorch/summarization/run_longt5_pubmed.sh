@@ -8,7 +8,8 @@ N_GPU=2
 MODEL=$([[ $DEBUG -eq 1 ]] && echo "Stancld/LongT5-Local-Base" || echo "Stancld/LongT5-TGlobal-Large")
 LAUNCH=$([[ $DEBUG -eq 1 ]] && echo "" || echo "-m torch.distributed.launch --nproc_per_node=$N_GPU")  # 2 GPUs given
 BF16=$([[ $DEBUG -eq 1 ]] && echo "False" || echo "True")  # BF16 can be used on A100
-NO_CUDA=$([[ $DEBUG -eq 1 ]] && echo "True" || echo "False")  # BF16 can be used on A100
+NO_CUDA=$([[ $DEBUG -eq 1 ]] && echo "True" || echo "False")
+FIND_UNUSED_PARAMS=$([[ $DEBUG -eq 1 ]] && echo "False" || echo "True")
 
 
 TOTAL_BATCH_SIZE=$([[ $DEBUG -eq 1 ]] && echo 1 || echo 128)
@@ -42,6 +43,7 @@ SCRIPT="python $LAUNCH run_summarization.py \
     --report_to all \
     --logging_steps 10 \
     --eval_steps 500 \
+    --find_unused_parameters=$FIND_UNUSED_PARAMS \
     --no_cuda=$NO_CUDA
 "
 
