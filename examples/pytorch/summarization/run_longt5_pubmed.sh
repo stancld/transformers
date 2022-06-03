@@ -39,6 +39,8 @@ SCRIPT="python $LAUNCH run_summarization.py \
     --generation_max_length 512 \
     --output_dir /tmp/longt5_pubmed \
     --report_to all \
+    --logging_steps 10 \
+    --eval_steps 500 \
     --no_cuda=$NO_CUDA
 "
 
