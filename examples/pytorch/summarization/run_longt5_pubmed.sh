@@ -14,7 +14,7 @@ NO_CUDA=$([[ $DEBUG -eq 1 ]] && echo "True" || echo "False")  # BF16 can be used
 TOTAL_BATCH_SIZE=$([[ $DEBUG -eq 1 ]] && echo 1 || echo 128)
 PER_DEVICE_BATCH_SIZE=4
 ACC_STEP=$((TOTAL_BATCH_SIZE / PER_DEVICE_BATCH_SIZE))
-ACC_STEP=$([[ $DEBUG -eq 1 ]] && echo $ACC_STEP || $((ACC_STEP / N_GPU)))
+ACC_STEP=$([[ $DEBUG -eq 1 ]] && echo $ACC_STEP || echo $((ACC_STEP / N_GPU)))
 
 
 SCRIPT="python $LAUNCH run_summarization.py \
