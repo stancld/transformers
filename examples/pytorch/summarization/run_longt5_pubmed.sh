@@ -1,3 +1,4 @@
+#!/bin/bash
 DEBUG=0
 
 DEBUG_CHECK=$([[ $DEBUG -eq 1 ]] && echo "on" || echo "off")
