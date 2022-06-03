@@ -536,6 +536,11 @@ def main():
         if "train" not in raw_datasets:
             raise ValueError("--do_train requires a train dataset")
         train_dataset = raw_datasets["train"]
+        selects = [
+            i for i in range(len(train_dataset))
+            if len(tokenizer(train_dataset[i]["article"], max_length=30).input_ids) > 16
+        ]
+        train_dataset = train_dataset.select(selects)
         if data_args.max_train_samples is not None:
             max_train_samples = min(len(train_dataset), data_args.max_train_samples)
             train_dataset = train_dataset.select(range(max_train_samples))
