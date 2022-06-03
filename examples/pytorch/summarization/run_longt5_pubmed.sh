@@ -13,7 +13,6 @@ NO_CUDA=$([[ $DEBUG -eq 1 ]] && echo "True" || echo "False")  # BF16 can be used
 
 TOTAL_BATCH_SIZE=$([[ $DEBUG -eq 1 ]] && echo 1 || echo 128)
 PER_DEVICE_BATCH_SIZE=1
-GRADIENT_CHECKPOINTING="False"
 ACC_STEP=$((TOTAL_BATCH_SIZE / PER_DEVICE_BATCH_SIZE))
 ACC_STEP=$([[ $DEBUG -eq 1 ]] && echo $ACC_STEP || echo $((ACC_STEP / N_GPU)))
 
@@ -32,7 +31,7 @@ SCRIPT="python $LAUNCH run_summarization.py \
     --learning_rate 0.001 \
     --lr_scheduler_type constant \
     --num_train_epochs 20 \
-    --gradient_checkpointing=$GRADIENT_CHECKPOINTING \
+    --gradient_checkpointing \
     --bf16=$BF16 \
     --per_device_eval_batch_size 8 \
     --predict_with_generate \
