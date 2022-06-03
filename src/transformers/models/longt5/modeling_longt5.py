@@ -958,7 +958,7 @@ class LongT5TransientGlobalAttention(nn.Module):
             if local_attention_mask is not None:
                 # (batch_size, 1, n_heads, block_len, 3 * block_len)
                 position_bias = position_bias + local_attention_mask.transpose(1, 2)
-            position_bias = position_bias.type(scores.dtype).to(scores.device)
+            position_bias = position_bias.type(scores.dtype)
 
             # Calculate global/side bias - shape: # (batch_size, num_heads, seq_len, global_seq_len)
             if mask is None:

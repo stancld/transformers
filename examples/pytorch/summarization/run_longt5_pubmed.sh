@@ -9,11 +9,11 @@ MODEL=$([[ $DEBUG -eq 1 ]] && echo "Stancld/LongT5-Local-Base" || echo "Stancld/
 LAUNCH=$([[ $DEBUG -eq 1 ]] && echo "" || echo "-m torch.distributed.launch --nproc_per_node=$N_GPU")  # 2 GPUs given
 BF16=$([[ $DEBUG -eq 1 ]] && echo "False" || echo "True")  # BF16 can be used on A100
 NO_CUDA=$([[ $DEBUG -eq 1 ]] && echo "True" || echo "False")
-FIND_UNUSED_PARAMS=$([[ $DEBUG -eq 1 ]] && echo "False" || echo "True")
+FIND_UNUSED_PARAMS="False"
 
 
 TOTAL_BATCH_SIZE=$([[ $DEBUG -eq 1 ]] && echo 1 || echo 128)
-PER_DEVICE_BATCH_SIZE=2
+PER_DEVICE_BATCH_SIZE=1
 ACC_STEP=$((TOTAL_BATCH_SIZE / PER_DEVICE_BATCH_SIZE))
 ACC_STEP=$([[ $DEBUG -eq 1 ]] && echo $ACC_STEP || echo $((ACC_STEP / N_GPU)))
 
