@@ -38,6 +38,7 @@ SCRIPT="python $LAUNCH run_summarization.py \
     --generation_num_beams 1 \
     --generation_max_length 512 \
     --output_dir /tmp/longt5_pubmed \
+    --run_name LongT5-pubmed-16k-512-bs_128 \
     --report_to all \
     --logging_steps 10 \
     --eval_steps 500 \
