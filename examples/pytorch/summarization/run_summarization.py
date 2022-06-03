@@ -27,7 +27,6 @@ from typing import Optional
 import datasets
 import nltk  # Here to have a nice missing dependency error message early on
 import numpy as np
-import wandb
 from datasets import load_dataset, load_metric
 
 import transformers
@@ -71,8 +70,6 @@ except (LookupError, OSError):
 # A list of all multilingual tokenizer which require lang attribute.
 MULTILINGUAL_TOKENIZERS = [MBartTokenizer, MBartTokenizerFast, MBart50Tokenizer, MBart50TokenizerFast]
 
-
-wandb.init(project="LongT5", entity="stancld")
 
 @dataclass
 class ModelArguments:
