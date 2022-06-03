@@ -869,7 +869,7 @@ class LongT5TransientGlobalAttention(nn.Module):
         side_bias = side_bias.permute([0, 3, 1, 2])
         # (batch_size, num_heads, seq_len, global_seq_len)
         attention_side_bias = attention_side_bias + side_bias
-        return attention_side_bias
+        return attention_side_bias.to(mask)
 
     def forward(
         self,
