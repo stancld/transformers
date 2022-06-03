@@ -869,7 +869,7 @@ class LongT5TransientGlobalAttention(nn.Module):
         side_bias = side_bias.permute([0, 3, 1, 2])
         # (batch_size, num_heads, seq_len, global_seq_len)
         attention_side_bias = attention_side_bias + side_bias
-        return attention_side_bias.to(mask)
+        return attention_side_bias
 
     def forward(
         self,
@@ -958,7 +958,7 @@ class LongT5TransientGlobalAttention(nn.Module):
             if local_attention_mask is not None:
                 # (batch_size, 1, n_heads, block_len, 3 * block_len)
                 position_bias = position_bias + local_attention_mask.transpose(1, 2)
-            position_bias = position_bias.type(scores.dtype)
+            position_bias = position_bias.type(scores.dtype).to(scores.device)
 
             # Calculate global/side bias - shape: # (batch_size, num_heads, seq_len, global_seq_len)
             if mask is None:
@@ -967,7 +967,7 @@ class LongT5TransientGlobalAttention(nn.Module):
             side_position_bias = self.compute_side_bias(mask, global_segment_ids)
             # (batch_size, num_blocks, num_heads, block_len, global_seq_len)
             side_position_bias = _split_into_blocks(side_position_bias, self.block_len, dim=-2).transpose(1, 2)
-            side_position_bias = side_position_bias.type(scores.dtype)
+            side_position_bias = side_position_bias.type(scores.dtype).to(scores.device)
             # (batch_size, num_blocks, num_heads, block_len, 3 * block_len + global_seq_len)
             position_bias = torch.cat([position_bias, side_position_bias], dim=-1)
 
