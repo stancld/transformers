@@ -44,6 +44,7 @@ SCRIPT="python $LAUNCH run_summarization.py \
     --logging_steps 10 \
     --eval_steps 500 \
     --ddp_find_unused_parameters=$FIND_UNUSED_PARAMS \
+    --pad_to_max_length \
     --no_cuda=$NO_CUDA
 "
 
