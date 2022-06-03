@@ -1,4 +1,4 @@
-DEBUG=1
+DEBUG=0
 
 DEBUG_CHECK=$([[ $DEBUG -eq 1 ]] && echo "on" || echo "off")
 echo "Debug mode is $DEBUG_CHECK."
@@ -10,9 +10,9 @@ BF16=$([[ $DEBUG -eq 1 ]] && echo "False" || echo "True")  # BF16 can be used on
 NO_CUDA=$([[ $DEBUG -eq 1 ]] && echo "True" || echo "False")  # BF16 can be used on A100
 
 
-TOTAL_BATHC_SIZE=$([[ $DEBUG -eq 1 ]] && echo 1 || echo 128)
-PER_DEVICE_BATCH_SIZE=1
-ACC_STEP=$((TOTAL_BATHC_SIZE / PER_DEVICE_BATCH_SIZE))
+TOTAL_BATCH_SIZE=$([[ $DEBUG -eq 1 ]] && echo 1 || echo 128)
+PER_DEVICE_BATCH_SIZE=4
+ACC_STEP=$((TOTAL_BATCH_SIZE / PER_DEVICE_BATCH_SIZE))
 ACC_STEP=$([[ $DEBUG -eq 1 ]] && echo $ACC_STEP || $((ACC_STEP / N_GPU)))
 
 
@@ -22,7 +22,6 @@ SCRIPT="python $LAUNCH run_summarization.py \
     --do_eval \
     --do_predict \
     --dataset_name ccdv/pubmed-summarization \
-    --source_prefix 'summarize: ' \
     --max_source_length 16384 \
     --max_target_length 512 \
     --per_device_train_batch_size $PER_DEVICE_BATCH_SIZE \
@@ -30,7 +29,7 @@ SCRIPT="python $LAUNCH run_summarization.py \
     --optim adafactor \
     --learning_rate 0.001 \
     --lr_scheduler_type constant \
-    --num_train_epochs 10 \
+    --num_train_epochs 20 \
     --gradient_checkpointing \
     --bf16=$BF16 \
     --per_device_eval_batch_size 8 \
@@ -38,6 +37,7 @@ SCRIPT="python $LAUNCH run_summarization.py \
     --generation_num_beams 1 \
     --generation_max_length 512 \
     --output_dir /tmp/longt5_pubmed \
+    --report_to all \
     --no_cuda=$NO_CUDA
 "
 
