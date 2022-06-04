@@ -34,7 +34,7 @@ SCRIPT="python $LAUNCH run_summarization.py \
     --num_train_epochs 20 \
     --gradient_checkpointing \
     --bf16=$BF16 \
-    --per_device_eval_batch_size 4 \
+    --per_device_eval_batch_size 2 \
     --predict_with_generate \
     --generation_num_beams 1 \
     --generation_max_length 512 \
