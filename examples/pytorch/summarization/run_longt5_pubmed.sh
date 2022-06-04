@@ -43,6 +43,7 @@ SCRIPT="python $LAUNCH run_summarization.py \
     --report_to all \
     --logging_steps 10 \
     --eval_steps 500 \
+    --evaluation_strategy steps \
     --ddp_find_unused_parameters=$FIND_UNUSED_PARAMS \
     --no_cuda=$NO_CUDA
 "
